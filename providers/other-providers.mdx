@@ -1,6 +1,6 @@
 ---
 title: Other Providers
-description: Support for z.ai, Kimi, Kilo, Kimi K2, Kiro, Vertex AI, Augment, Amp, JetBrains AI, OpenRouter, Antigravity, and Droid/Factory
+description: Support for z.ai, Kimi, Kilo, Kimi K2, Kiro, Vertex AI, Augment, Amp, JetBrains AI, OpenRouter, Antigravity, Droid/Factory, OpenCode, Warp, Ollama, and MiniMax
 ---
 
 CodexBar supports many additional AI coding assistant providers beyond the primary ones. Each has its own authentication method and usage tracking capabilities.
@@ -596,10 +596,231 @@ POST https://api.workos.com/user_management/authenticate
 
 ---
 
+## OpenCode
+
+Browser cookie-based provider for OpenCode usage tracking.
+
+### Features
+- Rolling 5-hour usage window (session)
+- Weekly usage window
+- Automatic workspace detection
+- Browser cookie import with caching
+
+### Authentication
+
+<Tabs>
+  <Tab title="Automatic">
+    1. Log in to [opencode.ai](https://opencode.ai) in Chrome
+    2. Enable OpenCode in **Settings → Providers**
+    3. CodexBar automatically imports and caches cookies
+  </Tab>
+  <Tab title="Manual Cookie">
+    1. Open opencode.ai in your browser
+    2. Copy the `Cookie:` header from Network tab
+    3. Paste into **Settings → Providers → OpenCode → Cookie source → Manual**
+  </Tab>
+  <Tab title="Workspace Override">
+    Set environment variable to skip workspace lookup:
+    ```bash
+    export CODEXBAR_OPENCODE_WORKSPACE_ID="wrk_..."
+    # or full URL
+    export CODEXBAR_OPENCODE_WORKSPACE_ID="https://opencode.ai/workspace/..."
+    ```
+  </Tab>
+</Tabs>
+
+### API Endpoints
+- `POST https://opencode.ai/_server`
+  - Workspaces: function ID `def39973159c7f0483d8793a822b8dbb10d067e12c65455fcb4608459ba0234f`
+  - Subscription: function ID `7abeebee372f304e050aaaf92be863f4a86490e382f8c79db68fd94040d691b4`
+
+### Usage Mapping
+- **Primary window**: Rolling 5-hour usage (`rollingUsage.usagePercent`, resets in `rollingUsage.resetInSec`)
+- **Secondary window**: Weekly usage (`weeklyUsage.usagePercent`, resets in `weeklyUsage.resetInSec`)
+
+### Notes
+- Responses are `text/javascript` with serialized objects (parsed via regex)
+- Cookie import defaults to Chrome-only to avoid browser prompts
+- Cached in Keychain (`com.steipete.codexbar.cache`, account `cookie.opencode`)
+
+---
+
+## Warp
+
+API token-based provider for Warp credit limits.
+
+### Features
+- Monthly credits usage tracking
+- Next refresh time display
+- Unlimited plan detection
+- Token-based authentication
+
+### Authentication
+
+<Tabs>
+  <Tab title="Settings">
+    1. Open **Settings → Providers**
+    2. Enable **Warp**
+    3. In Warp, go to **Profile → Settings → Platform → API Keys**
+    4. Create an API key (starts with `wk-...`)
+    5. Enter the key in CodexBar
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    export WARP_API_KEY="wk-..."
+    # or
+    export WARP_TOKEN="wk-..."
+    ```
+  </Tab>
+</Tabs>
+
+### API Endpoint
+- `POST https://app.warp.dev/graphql/v2?op=GetRequestLimitInfo`
+- Query: `GetRequestLimitInfo`
+- Fields: `isUnlimited`, `nextRefreshTime`, `requestLimit`, `requestsUsedSinceLastRefresh`
+
+### Usage Mapping
+- **Credits**: `requestsUsedSinceLastRefresh` / `requestLimit`
+- **Reset**: `nextRefreshTime`
+- **Unlimited plans**: Shows "Unlimited" with full bar
+
+### Troubleshooting
+
+<Accordion title="Missing Warp API key">
+  Add a key in **Settings → Providers → Warp**, or set `WARP_API_KEY`.
+</Accordion>
+
+<Accordion title="Warp API error">
+  Verify the token is valid and that your network can reach `app.warp.dev`.
+</Accordion>
+
+### Reference
+- [Warp API Keys Documentation](https://docs.warp.dev/reference/cli/api-keys)
+
+---
+
+## Ollama
+
+Browser cookie-based provider for Ollama Cloud Usage tracking.
+
+### Features
+- Plan tier detection (Free/Pro/Max)
+- Session usage window
+- Weekly usage window
+- Automatic reset time tracking
+
+### Authentication
+
+<Tabs>
+  <Tab title="Automatic">
+    1. Log in to [ollama.com/settings](https://ollama.com/settings) in Chrome
+    2. Enable Ollama in **Settings → Providers**
+    3. Leave **Cookie source** on **Auto** (imports Chrome cookies by default)
+  </Tab>
+  <Tab title="Manual Cookie">
+    1. Open ollama.com/settings in your browser
+    2. Copy the `Cookie:` header from Network tab
+    3. Paste into **Settings → Providers → Ollama → Cookie source → Manual**
+  </Tab>
+</Tabs>
+
+### How It Works
+- Scrapes `https://ollama.com/settings` using browser cookies
+- Parses:
+  - Plan badge from **Cloud Usage** header
+  - Session and weekly usage percentages
+  - Reset timestamps from `data-time` attributes
+
+### Usage Mapping
+- **Session**: Percentage from session usage bar
+- **Weekly**: Percentage from weekly usage bar
+- **Resets**: ISO timestamps from `data-time` attributes
+
+### Troubleshooting
+
+<Accordion title="No Ollama session cookie found">
+  Log in to ollama.com/settings in Chrome, then refresh in CodexBar. If using Safari or another browser, use **Cookie source → Manual**.
+</Accordion>
+
+<Accordion title="Ollama session cookie expired">
+  Sign out and back in at ollama.com/settings, then refresh.
+</Accordion>
+
+---
+
+## MiniMax
+
+API token or browser cookie-based provider with coding plan tracking.
+
+### Features
+- Coding plan usage (available vs. total)
+- Multiple authentication methods with fallback
+- Region selection (Global or China mainland)
+- Browser local storage token extraction
+
+### Authentication
+
+<Tabs>
+  <Tab title="API Token (Recommended)">
+    1. Get your API token from MiniMax platform
+    2. **Settings → Providers → MiniMax**
+    3. Enter API token
+    4. Select region (Global or China)
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    export MINIMAX_API_KEY="your-token"
+    ```
+  </Tab>
+  <Tab title="Browser Cookies (Automatic)">
+    1. Log in to platform.minimax.io (or platform.minimaxi.com for China)
+    2. Enable MiniMax in Settings
+    3. CodexBar imports cookies and extracts access token from local storage
+  </Tab>
+  <Tab title="Manual Cookie Header">
+    1. Open MiniMax Coding Plan page in browser
+    2. Copy full cURL command or `Cookie:` header from DevTools
+    3. Paste into **Settings → Providers → MiniMax → Cookie source → Manual**
+  </Tab>
+</Tabs>
+
+### API Endpoints
+- **API token**: `GET https://api.minimax.io/v1/coding_plan/remains`
+  - Requires `Authorization: Bearer <api_token>`
+- **Global web**: `https://platform.minimax.io`
+- **China web**: `https://platform.minimaxi.com`
+- **Coding plan page**: `{host}/user-center/payment/coding-plan`
+- **Remains API**: `GET {host}/v1/api/openplatform/coding_plan/remains`
+
+### Fallback Order
+1. API token (if provided)
+2. Cached cookie header (Keychain)
+3. Browser cookie import (Safari → Chrome → Firefox)
+4. Browser local storage access token (Chromium)
+5. Manual cookie header override
+
+### Environment Overrides
+- `MINIMAX_HOST` - Set to `platform.minimaxi.com` for China
+- `MINIMAX_CODING_PLAN_URL` - Full URL override for coding plan page
+- `MINIMAX_REMAINS_URL` - Full URL override for remains API
+- `MINIMAX_COOKIE` or `MINIMAX_COOKIE_HEADER` - Manual cookie
+
+### Usage Mapping
+- **Primary**: Percent used from `model_remains` (used/total)
+- **Window**: Derived from `start_time`/`end_time`
+- **Reset**: From `remains_time` or `end_time`
+
+### Notes
+- Cookies alone often fail (status 1004); remains API expects Bearer token
+- MiniMax stores `access_token` in Chromium local storage (LevelDB)
+- JWT tokens are automatically extracted when using browser auth
+
+---
+
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Configure Multiple Providers" icon="layer-group" href="/configuration">
+  <Card title="Configure Multiple Providers" icon="layer-group" href="/configuration/settings">
     Enable and manage multiple providers simultaneously
   </Card>
   <Card title="Author a New Provider" icon="code" href="/providers/authoring">
