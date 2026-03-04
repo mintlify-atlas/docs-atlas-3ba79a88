@@ -1,0 +1,115 @@
+{
+  "projectType": "general",
+  "projectName": "CodexBar",
+  "projectDescription": "macOS menu bar app that tracks usage stats for AI coding assistants including Codex, Claude, Cursor, Gemini, and more.",
+  "theme": "palm",
+  "primaryColor": "#1e9cfb",
+  "lightColor": "#45d4fc",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/menu-bar",
+              "features/multi-provider",
+              "features/merge-icons",
+              "features/privacy"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "providers/overview",
+              "providers/codex",
+              "providers/claude",
+              "providers/cursor",
+              "providers/gemini",
+              "providers/copilot",
+              "providers/other-providers",
+              "providers/authoring"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "cli/overview",
+              "cli/usage-command",
+              "cli/cost-command",
+              "cli/config-command"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/settings",
+              "configuration/permissions",
+              "configuration/config-file"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/architecture",
+              "development/building",
+              "development/contributing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "CLI Commands",
+            "pages": [
+              "api/cli-usage",
+              "api/cli-cost",
+              "api/cli-config"
+            ]
+          },
+          {
+            "group": "Provider API",
+            "pages": [
+              "api/provider-descriptor",
+              "api/provider-fetch",
+              "api/usage-models"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-provider menu bar with per-provider toggles",
+    "Session and weekly usage meters with reset countdowns",
+    "Bundled CLI for scripts and CI",
+    "Merge Icons mode to combine providers into one status item",
+    "Privacy-first on-device parsing with opt-in browser cookies",
+    "WidgetKit widget mirrors for menu card snapshots",
+    "OpenAI web dashboard enrichments for code review and usage breakdown",
+    "Local cost-usage scanning for last 30 days"
+  ],
+  "publicApiSurface": [
+    "codexbar usage [--provider <id>] [--format <text|json>]",
+    "codexbar cost [--provider <id>] [--format <text|json>]",
+    "codexbar config validate",
+    "codexbar config dump",
+    "ProviderDescriptor protocol",
+    "UsageFetcher API",
+    "CostUsageFetcher API",
+    "Provider CLI interfaces (RPC, PTY, OAuth, API token, local probe)",
+    "Configuration JSON schema at ~/.codexbar/config.json"
+  ]
+}
