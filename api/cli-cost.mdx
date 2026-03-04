@@ -1,0 +1,387 @@
+---
+title: "codexbar cost"
+description: "Print local token cost usage without web or CLI access"
+---
+
+## Synopsis
+
+```bash
+codexbar cost [OPTIONS]
+codexbar cost --format json --pretty
+codexbar cost --provider claude --refresh
+```
+
+The `cost` command analyzes local conversation history to calculate token usage and estimated costs for Claude and Codex. It does not require web or CLI access, making it useful for offline cost tracking.
+
+## Parameters
+
+<ParamField path="--provider" type="string" default="enabled providers in config">
+  Provider ID to analyze. Options:
+  - Specific provider ID (e.g., `codex`, `claude`)
+  - `both` - Analyze both Codex and Claude
+  - `all` - Analyze all providers with local conversation history
+  
+  Provider IDs are defined in `~/.codexbar/config.json`.
+</ParamField>
+
+<ParamField path="--format" type="string" default="text">
+  Output format. Options:
+  - `text` - Human-readable output with cost summaries
+  - `json` - Machine-readable JSON output with detailed token breakdowns
+</ParamField>
+
+<ParamField path="--refresh" type="boolean">
+  Ignore cached conversation scans and re-analyze all local data. Useful when conversation files have been updated.
+</ParamField>
+
+<ParamField path="--pretty" type="boolean">
+  Pretty-print JSON output with indentation.
+</ParamField>
+
+<ParamField path="--json-output" type="boolean">
+  Emit machine-readable JSONL logs on stderr.
+</ParamField>
+
+<ParamField path="--json-only" type="boolean">
+  Suppress non-JSON output; errors become JSON payloads.
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean">
+  Enable verbose logging.
+</ParamField>
+
+<ParamField path="--log-level" type="string">
+  Set log level: `trace`, `verbose`, `debug`, `info`, `warning`, `error`, or `critical`.
+</ParamField>
+
+<ParamField path="--no-color" type="boolean">
+  Disable ANSI colors in text output.
+</ParamField>
+
+<ParamField path="-h, --help" type="boolean">
+  Show help message.
+</ParamField>
+
+<ParamField path="-V, --version" type="boolean">
+  Show version information.
+</ParamField>
+
+## Response Fields
+
+### JSON Output Structure
+
+The `cost` command returns an array of provider cost payloads:
+
+<ResponseField name="provider" type="string" required>
+  Provider ID (e.g., `codex`, `claude`).
+</ResponseField>
+
+<ResponseField name="source" type="string" required>
+  Data source: always `local` for cost command.
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string" required>
+  ISO 8601 timestamp of when cost analysis was performed.
+</ResponseField>
+
+<ResponseField name="sessionTokens" type="integer">
+  Total tokens used in current session.
+</ResponseField>
+
+<ResponseField name="sessionCostUSD" type="number">
+  Estimated cost in USD for current session.
+</ResponseField>
+
+<ResponseField name="last30DaysTokens" type="integer">
+  Total tokens used in the last 30 days.
+</ResponseField>
+
+<ResponseField name="last30DaysCostUSD" type="number">
+  Estimated cost in USD for the last 30 days.
+</ResponseField>
+
+<ResponseField name="daily" type="array">
+  Array of daily token usage and cost breakdowns.
+  
+  <Expandable title="daily[] fields">
+    <ResponseField name="date" type="string" required>
+      Date in YYYY-MM-DD format.
+    </ResponseField>
+    
+    <ResponseField name="inputTokens" type="integer">
+      Input (prompt) tokens consumed.
+    </ResponseField>
+    
+    <ResponseField name="outputTokens" type="integer">
+      Output (completion) tokens generated.
+    </ResponseField>
+    
+    <ResponseField name="cacheReadTokens" type="integer">
+      Cache read tokens (prompt caching).
+    </ResponseField>
+    
+    <ResponseField name="cacheCreationTokens" type="integer">
+      Cache creation tokens (prompt caching).
+    </ResponseField>
+    
+    <ResponseField name="totalTokens" type="integer">
+      Total tokens for the day.
+    </ResponseField>
+    
+    <ResponseField name="totalCost" type="number">
+      Estimated cost in USD for the day.
+    </ResponseField>
+    
+    <ResponseField name="modelsUsed" type="array">
+      Array of model names used on that day.
+    </ResponseField>
+    
+    <ResponseField name="modelBreakdowns" type="array">
+      Per-model cost breakdown.
+      
+      <ResponseField name="modelName" type="string">
+        Model identifier (e.g., `claude-3-5-sonnet-20241022`, `gpt-4o`).
+      </ResponseField>
+      
+      <ResponseField name="cost" type="number">
+        Cost in USD for this model on this day.
+      </ResponseField>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="totals" type="object">
+  Aggregate token and cost totals.
+  
+  <Expandable title="totals fields">
+    <ResponseField name="inputTokens" type="integer">
+      Total input tokens across all days.
+    </ResponseField>
+    
+    <ResponseField name="outputTokens" type="integer">
+      Total output tokens across all days.
+    </ResponseField>
+    
+    <ResponseField name="cacheReadTokens" type="integer">
+      Total cache read tokens.
+    </ResponseField>
+    
+    <ResponseField name="cacheCreationTokens" type="integer">
+      Total cache creation tokens.
+    </ResponseField>
+    
+    <ResponseField name="totalTokens" type="integer">
+      Grand total of all tokens.
+    </ResponseField>
+    
+    <ResponseField name="totalCost" type="number">
+      Estimated total cost in USD.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Default cost analysis (text format)
+
+```bash
+codexbar cost
+```
+
+**Output:**
+```
+== Claude Local Cost Analysis ==
+Session: 45,234 tokens ($0.23)
+Last 30 days: 892,156 tokens ($4.51)
+
+Daily breakdown:
+  2025-12-04: 45,234 tokens ($0.23)
+  2025-12-03: 78,901 tokens ($0.41)
+  2025-12-02: 123,456 tokens ($0.68)
+  ...
+
+Models used: claude-3-5-sonnet-20241022, claude-3-opus-20240229
+
+== Codex Local Cost Analysis ==
+Session: 32,189 tokens ($0.18)
+Last 30 days: 654,321 tokens ($3.12)
+
+Daily breakdown:
+  2025-12-04: 32,189 tokens ($0.18)
+  2025-12-03: 56,789 tokens ($0.29)
+  2025-12-02: 98,765 tokens ($0.51)
+  ...
+
+Models used: gpt-4o, gpt-4-turbo
+```
+
+### JSON output with pretty printing
+
+```bash
+codexbar cost --format json --pretty
+```
+
+**Output:**
+```json
+[
+  {
+    "provider": "claude",
+    "source": "local",
+    "updatedAt": "2025-12-04T18:30:15Z",
+    "sessionTokens": 45234,
+    "sessionCostUSD": 0.23,
+    "last30DaysTokens": 892156,
+    "last30DaysCostUSD": 4.51,
+    "daily": [
+      {
+        "date": "2025-12-04",
+        "inputTokens": 25100,
+        "outputTokens": 18134,
+        "cacheReadTokens": 1500,
+        "cacheCreationTokens": 500,
+        "totalTokens": 45234,
+        "totalCost": 0.23,
+        "modelsUsed": ["claude-3-5-sonnet-20241022"],
+        "modelBreakdowns": [
+          {
+            "modelName": "claude-3-5-sonnet-20241022",
+            "cost": 0.23
+          }
+        ]
+      },
+      {
+        "date": "2025-12-03",
+        "inputTokens": 44500,
+        "outputTokens": 32401,
+        "cacheReadTokens": 1800,
+        "cacheCreationTokens": 200,
+        "totalTokens": 78901,
+        "totalCost": 0.41,
+        "modelsUsed": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
+        "modelBreakdowns": [
+          {
+            "modelName": "claude-3-5-sonnet-20241022",
+            "cost": 0.35
+          },
+          {
+            "modelName": "claude-3-opus-20240229",
+            "cost": 0.06
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "inputTokens": 498234,
+      "outputTokens": 385922,
+      "cacheReadTokens": 6500,
+      "cacheCreationTokens": 1500,
+      "totalTokens": 892156,
+      "totalCost": 4.51
+    }
+  },
+  {
+    "provider": "codex",
+    "source": "local",
+    "updatedAt": "2025-12-04T18:30:15Z",
+    "sessionTokens": 32189,
+    "sessionCostUSD": 0.18,
+    "last30DaysTokens": 654321,
+    "last30DaysCostUSD": 3.12,
+    "daily": [
+      {
+        "date": "2025-12-04",
+        "inputTokens": 18000,
+        "outputTokens": 14189,
+        "cacheReadTokens": 0,
+        "cacheCreationTokens": 0,
+        "totalTokens": 32189,
+        "totalCost": 0.18,
+        "modelsUsed": ["gpt-4o"],
+        "modelBreakdowns": [
+          {
+            "modelName": "gpt-4o",
+            "cost": 0.18
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "inputTokens": 378456,
+      "outputTokens": 275865,
+      "cacheReadTokens": 0,
+      "cacheCreationTokens": 0,
+      "totalTokens": 654321,
+      "totalCost": 3.12
+    }
+  }
+]
+```
+
+### Query specific provider
+
+```bash
+codexbar cost --provider claude --format json --pretty
+```
+
+### Force refresh (ignore cache)
+
+```bash
+codexbar cost --refresh
+```
+
+### Machine-readable output only
+
+```bash
+codexbar cost --json-only --format json
+```
+
+## Exit Codes
+
+- **0**: Success
+- **1**: Unexpected failure
+- **2**: Provider binary not found (not applicable for cost command)
+- **3**: Parse/format error
+- **4**: CLI timeout (not applicable for cost command)
+
+## Notes
+
+### Data Sources
+
+- The `cost` command analyzes local conversation history stored by the menubar app
+- Does not require web scraping, CLI tools, or API access
+- Useful for offline cost tracking and budgeting
+- **Claude**: Analyzes conversations from `~/Library/Application Support/Claude/`
+- **Codex**: Analyzes conversations from OpenAI API usage logs
+
+### Cost Estimation
+
+- Costs are **estimates** based on published pricing and may not reflect actual charges
+- Pricing varies by model:
+  - Input tokens, output tokens, and cache tokens are priced differently
+  - Some models have tiered pricing or volume discounts
+- Cache tokens (prompt caching) are typically cheaper than regular input tokens
+- Actual costs depend on your provider plan and any custom pricing agreements
+
+### Token Counting
+
+- Token counts are extracted from conversation metadata when available
+- For older conversations without metadata, tokens may be estimated using tokenizer libraries
+- Cache read/creation tokens are only counted for providers that support prompt caching (e.g., Claude)
+
+### Caching
+
+- By default, conversation scans are cached for performance
+- Use `--refresh` to ignore the cache and re-scan all conversations
+- Cache is automatically invalidated when new conversations are added
+
+### Supported Providers
+
+- **Claude**: Full support with prompt caching token breakdown
+- **Codex (OpenAI)**: Full support for GPT-4, GPT-4o, GPT-3.5-turbo, etc.
+- Other providers may have limited or no local cost tracking
+
+### Time Windows
+
+- **Session**: Current session's token usage (resets with the provider's session window)
+- **Last 30 days**: Rolling 30-day window of token usage
+- Daily breakdown includes all days with recorded usage in the last 30 days

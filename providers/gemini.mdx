@@ -1,0 +1,221 @@
+---
+title: Gemini Provider
+description: Track Google Gemini usage with OAuth-backed quota APIs
+---
+
+The Gemini provider tracks usage for Google's Gemini coding assistant using OAuth credentials from the Gemini CLI and private quota APIs.
+
+## Features
+
+- Model-specific quota tracking (Pro and Flash models)
+- Automatic OAuth token refresh
+- Tier detection (Free, Paid, Workspace, Legacy)
+- Project discovery for quota billing
+- Status page integration with Google Workspace incidents
+
+## Authentication Method
+
+Gemini uses OAuth authentication via Gemini CLI credentials. Browser cookies are not supported.
+
+<Tabs>
+  <Tab title="OAuth Setup">
+    ### OAuth Authentication
+
+    **Setup:**
+    1. Install Gemini CLI:
+       ```bash
+       npm install -g @google/gemini-cli
+       ```
+    2. Authenticate:
+       ```bash
+       gemini auth login
+       ```
+    3. CodexBar reads credentials from `~/.gemini/oauth_creds.json`
+
+    **Credentials File:**
+    - Location: `~/.gemini/oauth_creds.json`
+    - Required fields: `access_token`, `id_token`, `expiry_date`
+    - Optional: `refresh_token` (for automatic token refresh)
+
+    **Supported Auth Types:**
+    - `oauth-personal` - Personal Google account (supported)
+    - Unknown type - Tries OAuth credentials (supported)
+    - `api-key` - API key auth (not supported, hard error)
+    - `vertex-ai` - Vertex AI auth (not supported, hard error)
+
+    Settings are read from `~/.gemini/settings.json`.
+  </Tab>
+
+  <Tab title="Token Refresh">
+    ### Automatic Token Refresh
+
+    If the access token is expired, CodexBar refreshes it via Google OAuth.
+
+    **How it works:**
+    1. Detects expired token from `expiry_date`
+    2. Locates Gemini CLI installation
+    3. Extracts OAuth client ID/secret from:
+       - Homebrew path: `.../libexec/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js`
+       - Bun/npm path: `.../node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js`
+    4. Calls `POST https://oauth2.googleapis.com/token` with:
+       - `client_id`, `client_secret`
+       - `refresh_token`
+       - `grant_type=refresh_token`
+
+    **Regex extraction:**
+    - `OAUTH_CLIENT_ID` from `oauth2.js`
+    - `OAUTH_CLIENT_SECRET` from `oauth2.js`
+  </Tab>
+</Tabs>
+
+## API Endpoints
+
+### Quota API
+```
+POST https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota
+```
+**Headers:**
+- `Authorization: Bearer <access_token>`
+
+**Body:**
+```json
+{
+  "project": "<projectId>"
+}
+```
+Or `{}` if project is unknown.
+
+**Returns:**
+- Quota buckets per model:
+  - `remainingFraction` (0.0 to 1.0)
+  - `resetTime` (ISO-8601)
+  - `modelId`
+
+### Project Discovery
+CodexBar discovers the quota project ID via:
+
+1. **Primary**: `cloudaicompanionProject` from `loadCodeAssist`
+2. **Fallback**:
+   ```
+   GET https://cloudresourcemanager.googleapis.com/v1/projects
+   ```
+   Picks project with:
+   - Name starts with `gen-lang-client*`
+   - Or label `generative-language`
+
+### Tier Detection
+```
+POST https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist
+```
+**Body:**
+```json
+{
+  "metadata": {
+    "ideType": "GEMINI_CLI",
+    "pluginType": "GEMINI"
+  }
+}
+```
+
+**Returns:**
+- `standard-tier` → "Paid"
+- `free-tier` + `hd` claim → "Workspace"
+- `free-tier` → "Free"
+- `legacy-tier` → "Legacy"
+
+## Parsing and Mapping
+
+### Quota Buckets
+
+For each model, CodexBar finds the lowest `remainingFraction`:
+- `percentLeft = remainingFraction * 100`
+
+### Reset Time
+
+- Parsed as ISO-8601
+- Formatted as "Resets in Xh Ym"
+
+### UI Mapping
+
+- **Primary**: Pro models (lowest percent left)
+- **Secondary**: Flash models (lowest percent left)
+
+### Plan Detection
+
+- **Tier**: From `loadCodeAssist` response
+- **Email**: From `id_token` JWT claims
+
+## Status Page Integration
+
+CodexBar monitors Google Workspace incidents for the Gemini product:
+
+- Polls Google Workspace Status API
+- Displays incident badge on menu bar icon
+- Shows incident details in menu
+- Click "View Status" to open status page
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="OAuth credentials not found">
+    Gemini CLI is not authenticated or credentials file is missing.
+    
+    **Solution:**
+    1. Install Gemini CLI: `npm install -g @google/gemini-cli`
+    2. Authenticate: `gemini auth login`
+    3. Verify credentials: `cat ~/.gemini/oauth_creds.json`
+  </Accordion>
+
+  <Accordion title="Unsupported auth type (api-key or vertex-ai)">
+    CodexBar only supports OAuth authentication.
+    
+    **Solution:**
+    1. Switch to OAuth: `gemini auth login`
+    2. Select "Personal Google account" when prompted
+    3. Or use the Vertex AI provider instead (for Vertex AI auth)
+  </Accordion>
+
+  <Accordion title="Token refresh failed">
+    The refresh token may be invalid or revoked.
+    
+    **Solution:**
+    1. Re-authenticate: `gemini auth logout && gemini auth login`
+    2. Check that `~/.gemini/oauth_creds.json` includes `refresh_token`
+  </Accordion>
+
+  <Accordion title="No quota data">
+    The quota API may not be returning data for your project.
+    
+    **Solution:**
+    1. Check that you have access to the Gemini API
+    2. Verify your project has Gemini API enabled
+    3. Try running `gemini /stats` in the CLI to verify quota visibility
+  </Accordion>
+
+  <Accordion title="OAuth client ID/secret extraction failed">
+    CodexBar couldn't find the Gemini CLI installation or extract credentials.
+    
+    **Solution:**
+    1. Verify Gemini CLI is installed: `which gemini`
+    2. Check installation path: `npm list -g @google/gemini-cli`
+    3. Reinstall if necessary: `npm install -g @google/gemini-cli`
+  </Accordion>
+</AccordionGroup>
+
+## CLI Usage
+
+```bash
+# Show Gemini usage
+codexbar --provider gemini
+codexbar -p gemini
+```
+
+## Key Files
+
+- **Status probe**: `Sources/CodexBarCore/Providers/Gemini/GeminiStatusProbe.swift`
+
+## Related Documentation
+
+- [Vertex AI Provider](/providers/other-providers#vertex-ai) - Alternative for Vertex AI auth
+- [CLI Reference](/cli/overview) - CLI usage and options
+- [Provider Authoring](/providers/authoring) - How providers work internally

@@ -1,0 +1,153 @@
+---
+title: "Multi-Provider Support"
+description: "Track usage limits across 15+ AI providers including Codex, Claude, Cursor, Gemini, Copilot, and more"
+---
+
+## Overview
+
+CodexBar supports tracking usage limits across 15+ AI providers simultaneously. Each provider can be toggled independently in Settings → Providers, giving you complete control over which services appear in your menu bar.
+
+## Supported Providers
+
+CodexBar integrates with the following AI services:
+
+<CardGroup cols={3}>
+  <Card title="Codex" icon="code">
+    Local CLI RPC + optional web dashboard extras
+  </Card>
+  <Card title="Claude" icon="message-bot">
+    OAuth API, browser cookies, or CLI fallback
+  </Card>
+  <Card title="Cursor" icon="arrow-pointer">
+    Browser session cookies for plan + usage
+  </Card>
+  <Card title="Gemini" icon="gem">
+    OAuth-backed quota API via CLI credentials
+  </Card>
+  <Card title="Copilot" icon="github">
+    GitHub device flow + internal usage API
+  </Card>
+  <Card title="Antigravity" icon="rocket">
+    Local language server probe (experimental)
+  </Card>
+  <Card title="Droid (Factory)" icon="robot">
+    Browser cookies + WorkOS token flows
+  </Card>
+  <Card title="z.ai" icon="bolt">
+    API token for quota + MCP windows
+  </Card>
+  <Card title="Kimi" icon="sparkles">
+    Auth token for weekly quota + rate limit
+  </Card>
+  <Card title="Kiro" icon="aws">
+    CLI-based usage via kiro-cli command
+  </Card>
+  <Card title="Vertex AI" icon="google">
+    Google Cloud gcloud OAuth with cost tracking
+  </Card>
+  <Card title="JetBrains AI" icon="laptop-code">
+    Local XML-based quota from IDE config
+  </Card>
+  <Card title="Augment" icon="circle-plus">
+    Browser cookie auth with auto keepalive
+  </Card>
+  <Card title="Amp" icon="wave-pulse">
+    Browser cookie-based usage tracking
+  </Card>
+  <Card title="OpenRouter" icon="route">
+    API token for multi-provider credit tracking
+  </Card>
+</CardGroup>
+
+## Authentication Strategies
+
+CodexBar uses multiple authentication methods depending on the provider:
+
+### Local CLI/RPC
+- **Codex**: JSON-RPC via `codex` command with PTY fallback
+- **Claude**: PTY scrape from `claude` CLI
+- **Kiro**: Usage command via `kiro-cli`
+- **Gemini**: OAuth credentials from Gemini CLI
+
+### Browser Cookies
+- **Cursor, Droid, Amp**: Reuses browser session cookies
+- **Cookie source picker**: Choose Automatic or Manual in Settings
+- **Cached in Keychain**: Cookies are stored and reused until invalid to minimize prompts
+
+<Warning>
+Browser cookie imports require the "Chrome Safe Storage" key from Keychain. Add CodexBar to the Access Control list in Keychain Access.app to prevent repeated prompts.
+</Warning>
+
+### OAuth & API Tokens
+- **Copilot**: GitHub device flow
+- **z.ai, Kimi K2, OpenRouter**: API tokens stored in Keychain
+- **Vertex AI**: Google Cloud ADC (Application Default Credentials)
+
+### Local Probes
+- **Antigravity**: Language server HTTP endpoint
+- **JetBrains AI**: XML quota files from IDE configuration
+
+## Per-Provider Configuration
+
+Each provider offers specific configuration options in Settings → Providers:
+
+- **Enable/disable**: Toggle providers on or off
+- **Cookie source**: Automatic browser import or manual cookie headers
+- **Auth tokens**: Store API keys securely in Keychain
+- **Dashboard extras**: Optional web scraping for additional metrics (Codex only)
+- **Account switchers**: Multiple token support for providers with account switching
+
+## Usage Metrics Tracked
+
+<CardGroup cols={2}>
+  <Card title="Session Limits" icon="hourglass-half">
+    5-hour or per-session usage windows
+  </Card>
+  <Card title="Weekly Limits" icon="calendar-week">
+    7-day rolling windows with reset countdowns
+  </Card>
+  <Card title="Credits" icon="coins">
+    Prepaid credit balances and consumption rates
+  </Card>
+  <Card title="Rate Limits" icon="gauge">
+    Per-minute or per-hour request throttling
+  </Card>
+</CardGroup>
+
+## Status Monitoring
+
+CodexBar polls status pages for supported providers and displays incident badges:
+
+- **Statuspage.io integration**: OpenAI (Codex), Anthropic (Claude), GitHub (Copilot), Cursor
+- **Google Workspace**: Gemini and Antigravity status
+- **Factory Status**: Droid/Factory incidents
+- **Icon overlays**: Visual indicators appear on menu bar icons during incidents
+
+## Local Cost Tracking
+
+For Codex and Claude, CodexBar scans local JSONL logs to calculate token costs:
+
+- **Codex**: `~/.codex/sessions/**/*.jsonl`
+- **Claude**: `~/.config/claude/projects/**/*.jsonl`
+- **Vertex AI**: Claude logs filtered to Vertex AI-tagged entries
+- **Time range**: Last 30 days by default
+- **Privacy-first**: All parsing happens on-device
+
+<Info>
+Use the bundled CLI for cost reporting: `codexbar cost --provider codex` or `codexbar cost --provider claude`
+</Info>
+
+## Adding New Providers
+
+CodexBar is extensible. See the [provider authoring guide](https://github.com/steipete/CodexBar/blob/main/docs/provider.md) to contribute support for additional AI services.
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Menu Bar Interface" icon="bars" href="/features/menu-bar">
+    Understand the two-bar meter visualization
+  </Card>
+  <Card title="Privacy & Security" icon="shield-check" href="/features/privacy">
+    Learn how CodexBar protects your data
+  </Card>
+</CardGroup>

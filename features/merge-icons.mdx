@@ -1,0 +1,137 @@
+---
+title: "Merge Icons Mode"
+description: "Combine multiple providers into a single menu bar item with a provider switcher and optional Overview tab"
+---
+
+## Overview
+
+Merge Icons mode consolidates all enabled providers into a single menu bar status item, helping you save precious menu bar space. Instead of showing separate icons for each provider, you get one unified icon with an intelligent switcher interface.
+
+## How It Works
+
+<Steps>
+  <Step title="Enable Merge Icons">
+    Open Settings → Display and toggle "Merge Icons" to combine all providers into one status item
+  </Step>
+  <Step title="Provider Switcher">
+    Click the menu bar icon to reveal a switcher that lets you navigate between providers
+  </Step>
+  <Step title="Optional Overview Tab">
+    Configure up to 3 providers to appear in a unified Overview tab for at-a-glance monitoring
+  </Step>
+</Steps>
+
+## Provider Switcher
+
+The switcher interface makes it easy to jump between providers:
+
+- **Menu bar click**: Opens the provider switcher
+- **Provider selection**: Click any provider to view its detailed usage card
+- **Dynamic ordering**: Provider order follows your Settings → Providers configuration
+- **Status indicators**: Icons show errors, staleness, or incident overlays per provider
+
+<Note>
+The menu bar icon in Merge Icons mode uses the selected provider's data to render the two-bar meter. When Overview is active, it shows an aggregate or primary provider's status.
+</Note>
+
+## Overview Tab
+
+The Overview tab provides a consolidated view of your most important providers:
+
+### Configuration
+
+1. Open Settings → Display → "Overview tab providers"
+2. Select up to 3 providers to include in the Overview
+3. The Overview tab appears in the switcher when providers are selected
+
+### Overview Display
+
+<CardGroup cols={2}>
+  <Card title="Multi-Row Layout" icon="table">
+    Up to 3 provider rows displayed simultaneously
+  </Card>
+  <Card title="Quick Access" icon="hand-pointer">
+    Click any row to jump to that provider's detail card
+  </Card>
+  <Card title="Smart Ordering" icon="arrow-down-1-9">
+    Row order follows your Settings → Providers sequence
+  </Card>
+  <Card title="Hide When Empty" icon="eye-slash">
+    Overview tab is hidden if no providers are selected
+  </Card>
+</CardGroup>
+
+### What's Shown
+
+- **Provider name and icon**: Visual identification
+- **Session usage**: Current 5-hour/session window status
+- **Weekly usage**: 7-day rolling window (when available)
+- **Reset countdown**: Time until next limit refresh
+- **Error states**: Dimmed rows indicate stale data or fetch failures
+
+## Benefits of Merge Icons
+
+<CardGroup cols={2}>
+  <Card title="Space Saving" icon="compress">
+    Replace multiple menu bar icons with a single status item
+  </Card>
+  <Card title="Reduced Clutter" icon="broom">
+    Keep your menu bar clean while monitoring many providers
+  </Card>
+  <Card title="Unified Interface" icon="table-cells">
+    Consistent navigation across all AI services
+  </Card>
+  <Card title="Flexible Overview" icon="eye">
+    Focus on your 3 most-used providers at a glance
+  </Card>
+</CardGroup>
+
+## Icon Rendering in Merge Mode
+
+The unified menu bar icon adapts based on your current view:
+
+- **Selected provider**: Shows the two-bar meter for the currently displayed provider
+- **Overview active**: Displays a representative status (typically the first selected provider)
+- **Fill behavior**: Respects the "Show usage as used" setting (remaining vs. consumed)
+- **Dimming**: Icon dims when any provider data is stale or errored
+- **Status overlays**: Incident indicators appear when any monitored provider has issues
+
+<Tip>
+For a more branded look, enable "Provider branding icons" in Settings → Display to show provider logos instead of meter bars, even in Merge Icons mode.
+</Tip>
+
+## Switching Between Modes
+
+You can toggle Merge Icons on and off at any time:
+
+- **Separate icons mode**: Each enabled provider gets its own menu bar status item
+- **Merge Icons mode**: All providers share a single status item with switcher
+- **No app restart required**: The menu bar updates immediately
+
+## Example Workflows
+
+### Monitoring 3 Key Providers
+
+1. Enable Codex, Claude, and Cursor in Settings → Providers
+2. Turn on Merge Icons in Settings → Display
+3. Add all three to "Overview tab providers"
+4. Click the menu bar icon to see all three at once
+5. Click any row to dive into detailed usage for that provider
+
+### Space-Constrained Menu Bar
+
+1. Enable 10+ providers for comprehensive tracking
+2. Turn on Merge Icons to use just one menu bar slot
+3. Select your 3 most-used providers for Overview
+4. Use the switcher to access detailed views as needed
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Provider Support" icon="grid" href="/features/multi-provider">
+    See all 15+ supported AI providers
+  </Card>
+  <Card title="Menu Bar Interface" icon="bars" href="/features/menu-bar">
+    Learn about the two-bar meter visualization
+  </Card>
+</CardGroup>

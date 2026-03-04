@@ -1,0 +1,459 @@
+---
+title: Provider Authoring Guide
+description: Learn how to add a new provider to CodexBar with shared host APIs and fetch strategies
+---
+
+Adding a new provider to CodexBar should feel like:
+- Add one folder
+- Define one descriptor + strategies
+- Add one implementation (UI hooks only)
+- Done (tests + docs)
+
+This guide describes the current provider architecture and the exact steps to add a new provider.
+
+## Architecture Overview
+
+CodexBar's provider system is descriptor-driven:
+
+- **Providers**: Sources of usage/quota/status data (Codex, Claude, Gemini, Antigravity, Cursor, etc.)
+- **Descriptors**: Single source of truth for labels, URLs, defaults, and fetch strategies
+- **Fetch strategies**: Concrete ways to obtain usage (CLI, web cookies, OAuth API, local probe, etc.)
+- **Host APIs**: Shared capabilities provided to providers (Keychain, browser cookies, PTY, HTTP, WebView scrape, token-cost)
+- **Identity fields**: Email/org/plan/loginMethod - must stay **siloed per provider**
+
+## Key Principles
+
+<AccordionGroup>
+  <Accordion title="Descriptor-Driven">
+    All provider metadata lives in the descriptor:
+    - Display labels, URLs, default enablement
+    - UI branding (icon, color)
+    - Capabilities (credits, token cost, status polling, login)
+    - Fetch pipeline (ordered strategies with fallback)
+    - CLI metadata (name, aliases, version provider)
+  </Accordion>
+
+  <Accordion title="Strategy Pipeline">
+    A provider declares strategies in priority order:
+    - Each strategy advertises a `kind` (cli, web cookies, oauth, api token, local probe, web dashboard)
+    - Declares availability (checks settings, cookies, env vars, installed CLI)
+    - Fetches `UsageSnapshot` (and optional credits/dashboard)
+    - Can be filtered by CLI `--source` or app settings
+    - Pipeline resolves to best available strategy with fallback on failure
+  </Accordion>
+
+  <Accordion title="Host APIs">
+    Providers use narrow, explicit APIs:
+    - `KeychainAPI` - Read-only, allowlisted service/account pairs
+    - `BrowserCookieAPI` - Import cookies by domain list
+    - `PTYAPI` - Run CLI interactions with timeouts
+    - `HTTPAPI` - URLSession with domain allowlist
+    - `WebViewScrapeAPI` - WKWebView lease + evaluateJavaScript
+    - `TokenCostAPI` - Cost Usage local-log integration
+    - `StatusAPI` - Status polling helpers
+    - `LoggerAPI` - Scoped logger + redaction
+    
+    Providers don't talk to `FileManager`, `Security`, or "browser internals" directly.
+  </Accordion>
+
+  <Accordion title="Identity Silo">
+    Never display identity/plan fields from provider A inside provider B UI. Each provider's identity is kept separate.
+  </Accordion>
+</AccordionGroup>
+
+## Building Blocks
+
+Common utilities already exist:
+
+- **PTY**: `TTYCommandRunner`
+- **Subprocess**: `SubprocessRunner`
+- **Cookie import**: `BrowserCookieImporter` (Safari/Chrome/Firefox adapters)
+- **Web scrape**: `OpenAIDashboardFetcher` (WKWebView + JS)
+- **Cost usage**: Local log scanner (Codex + Claude)
+
+## Provider Code Layout
+
+```
+Sources/CodexBarCore/Providers/<ProviderID>/
+  <ProviderID>Descriptor.swift       # Descriptor + strategy pipeline
+  <ProviderID>Strategies.swift       # Strategy implementations
+  <ProviderID>Probe.swift            # Fetcher/probe logic
+  <ProviderID>Models.swift           # Snapshot structs
+  <ProviderID>Parser.swift           # Text/HTML parsing (if needed)
+
+Sources/CodexBar/Providers/<ProviderID>/
+  <ProviderID>ProviderImplementation.swift  # Settings/login UI hooks only
+```
+
+## Minimal Provider Example
+
+Here's a complete minimal provider you can copy and modify:
+
+```swift
+import CodexBarMacroSupport
+import Foundation
+
+@ProviderDescriptorRegistration
+@ProviderDescriptorDefinition
+public enum ExampleProviderDescriptor {
+    static func makeDescriptor() -> ProviderDescriptor {
+        ProviderDescriptor(
+            id: .example,
+            metadata: ProviderMetadata(
+                id: .example,
+                displayName: "Example",
+                sessionLabel: "Session",
+                weeklyLabel: "Weekly",
+                opusLabel: nil,
+                supportsOpus: false,
+                supportsCredits: false,
+                creditsHint: "",
+                toggleTitle: "Show Example usage",
+                cliName: "example",
+                defaultEnabled: false,
+                isPrimaryProvider: false,
+                usesAccountFallback: false,
+                dashboardURL: nil,
+                statusPageURL: nil),
+            branding: ProviderBranding(
+                iconStyle: .codex,
+                iconResourceName: "ProviderIcon-example",
+                color: ProviderColor(red: 0.2, green: 0.6, blue: 0.8)),
+            tokenCost: ProviderTokenCostConfig(
+                supportsTokenCost: false,
+                noDataMessage: { "Example cost summary is not supported." }),
+            fetchPlan: ProviderFetchPlan(
+                sourceModes: [.auto, .cli],
+                pipeline: ProviderFetchPipeline(resolveStrategies: { _ in [ExampleFetchStrategy()] })),
+            cli: ProviderCLIConfig(
+                name: "example",
+                versionDetector: nil))
+    }
+}
+
+struct ExampleFetchStrategy: ProviderFetchStrategy {
+    let id: String = "example.cli"
+    let kind: ProviderFetchKind = .cli
+
+    func isAvailable(_: ProviderFetchContext) async -> Bool { true }
+
+    func fetch(_: ProviderFetchContext) async throws -> ProviderFetchResult {
+        let usage = UsageSnapshot(
+            primary: .init(usedPercent: 0, windowMinutes: nil, resetsAt: nil, resetDescription: nil),
+            secondary: nil,
+            updatedAt: Date(),
+            identity: nil)
+        return self.makeResult(usage: usage, sourceLabel: "cli")
+    }
+
+    func shouldFallback(on _: Error, context _: ProviderFetchContext) -> Bool { false }
+}
+```
+
+## Adding a New Provider: Checklist
+
+<Steps>
+  <Step title="Add Provider Case">
+    Add a case to `UsageProvider` enum in `Sources/CodexBarCore/Providers/Providers.swift`:
+    ```swift
+    public enum UsageProvider: String, CaseIterable {
+        case codex
+        case claude
+        // ... existing providers
+        case example  // ← Add your provider here
+    }
+    ```
+  </Step>
+
+  <Step title="Create Descriptor Folder">
+    Create `Sources/CodexBarCore/Providers/<ProviderID>/` with:
+    - `<ProviderID>Descriptor.swift` - Define `ProviderDescriptor` + fetch pipeline
+    - `<ProviderID>Strategies.swift` - Implement `ProviderFetchStrategy`
+    - `<ProviderID>Probe.swift` - Concrete fetcher logic
+    - `<ProviderID>Models.swift` - Snapshot structs
+    - `<ProviderID>Parser.swift` - Text/HTML parsing (if needed)
+  </Step>
+
+  <Step title="Attach Macros">
+    Attach `@ProviderDescriptorRegistration` + `@ProviderDescriptorDefinition` to your descriptor type.
+    Implement `static func makeDescriptor() -> ProviderDescriptor`.
+    
+    Macros auto-register the descriptor - no manual list edits needed.
+  </Step>
+
+  <Step title="Create Implementation">
+    Create `Sources/CodexBar/Providers/<ProviderID>/<ProviderID>ProviderImplementation.swift`:
+    - Attach `@ProviderImplementationRegistration` macro (auto-registers)
+    - Implement `ProviderImplementation` protocol for settings/login UI hooks only
+  </Step>
+
+  <Step title="Add Branding Assets">
+    Add icons + color in descriptor:
+    - `iconName` must match `ProviderIcon-<id>` asset in `Assets.xcassets`
+    - Color used in menu cards + switcher
+  </Step>
+
+  <Step title="CLI Support (Optional)">
+    If CLI-specific behavior is needed:
+    - Add `cliName`, `cliAliases`, `sourceModes`, `versionProvider` in descriptor
+    - Strategies decide which `--source` modes apply
+  </Step>
+
+  <Step title="Write Tests">
+    Add tests to `Tests/CodexBarTests/`:
+    - `UsageSnapshot` mapping unit tests
+    - Strategy availability + fallback tests
+    - CLI provider parsing (aliases + --source validation)
+  </Step>
+
+  <Step title="Document the Provider">
+    Add provider section in `docs/providers.md` with:
+    - Data source details
+    - Authentication methods
+    - API endpoints (if applicable)
+    - Troubleshooting tips
+  </Step>
+</Steps>
+
+## Fetch Strategy Types
+
+### CLI PTY Strategy
+```swift
+struct ExampleCLIStrategy: ProviderFetchStrategy {
+    let id: String = "example.cli"
+    let kind: ProviderFetchKind = .cli
+    
+    func isAvailable(_ context: ProviderFetchContext) async -> Bool {
+        // Check if CLI is installed and authenticated
+        return FileManager.default.fileExists(atPath: "/usr/local/bin/example")
+    }
+    
+    func fetch(_ context: ProviderFetchContext) async throws -> ProviderFetchResult {
+        // Run CLI command and parse output
+        let output = try await TTYCommandRunner.run("example", args: ["status"])
+        let usage = parseOutput(output)
+        return makeResult(usage: usage, sourceLabel: "cli")
+    }
+}
+```
+
+### Web API with Cookies
+```swift
+struct ExampleWebStrategy: ProviderFetchStrategy {
+    let id: String = "example.web"
+    let kind: ProviderFetchKind = .webCookies
+    
+    func isAvailable(_ context: ProviderFetchContext) async -> Bool {
+        // Check if cookies are available
+        let cookies = await BrowserCookieImporter.import(domain: "example.com")
+        return cookies != nil
+    }
+    
+    func fetch(_ context: ProviderFetchContext) async throws -> ProviderFetchResult {
+        let cookies = await BrowserCookieImporter.import(domain: "example.com")
+        let response = try await HTTPAPI.get(url: "https://api.example.com/usage", cookies: cookies)
+        let usage = parseJSON(response)
+        return makeResult(usage: usage, sourceLabel: "web")
+    }
+}
+```
+
+### OAuth API
+```swift
+struct ExampleOAuthStrategy: ProviderFetchStrategy {
+    let id: String = "example.oauth"
+    let kind: ProviderFetchKind = .oauth
+    
+    func isAvailable(_ context: ProviderFetchContext) async -> Bool {
+        // Check if OAuth credentials exist
+        let token = await KeychainAPI.read(service: "example", account: "oauth")
+        return token != nil
+    }
+    
+    func fetch(_ context: ProviderFetchContext) async throws -> ProviderFetchResult {
+        var token = try await getAccessToken()
+        if isExpired(token) {
+            token = try await refreshToken(token)
+        }
+        let response = try await HTTPAPI.get(
+            url: "https://api.example.com/usage",
+            headers: ["Authorization": "Bearer \(token)"])
+        let usage = parseJSON(response)
+        return makeResult(usage: usage, sourceLabel: "oauth")
+    }
+}
+```
+
+### Local Probe
+```swift
+struct ExampleLocalStrategy: ProviderFetchStrategy {
+    let id: String = "example.local"
+    let kind: ProviderFetchKind = .localProbe
+    
+    func isAvailable(_ context: ProviderFetchContext) async -> Bool {
+        // Check if local file/server exists
+        return FileManager.default.fileExists(atPath: "~/.example/quota.json")
+    }
+    
+    func fetch(_ context: ProviderFetchContext) async throws -> ProviderFetchResult {
+        let data = try Data(contentsOf: URL(fileURLWithPath: "~/.example/quota.json"))
+        let usage = try JSONDecoder().decode(UsageSnapshot.self, from: data)
+        return makeResult(usage: usage, sourceLabel: "local")
+    }
+}
+```
+
+## Guardrails (Non-Negotiable)
+
+<Warning>
+  These rules ensure CodexBar remains reliable, private, and secure:
+  
+  - **Identity silo**: Never display identity/plan fields from provider A inside provider B UI
+  - **Privacy**: Default to on-device parsing; browser cookies are opt-in and never persisted by us beyond WebKit stores
+  - **Reliability**: Providers must be timeout-bounded; no unbounded waits on network/PTY/UI
+  - **Degradation**: Prefer cached data over flapping; show clear errors when stale
+</Warning>
+
+## Testing Your Provider
+
+### Unit Tests
+```swift
+final class ExampleProviderTests: XCTestCase {
+    func test_parseUsageSnapshot() throws {
+        let json = """
+        {"used": 50, "total": 100}
+        """
+        let snapshot = try ExampleParser.parse(json)
+        XCTAssertEqual(snapshot.primary.usedPercent, 50.0)
+    }
+    
+    func test_strategyAvailability() async {
+        let strategy = ExampleCLIStrategy()
+        let context = ProviderFetchContext(...)
+        let available = await strategy.isAvailable(context)
+        XCTAssertTrue(available)
+    }
+}
+```
+
+### Integration Testing
+```bash
+# Build and run
+./Scripts/compile_and_run.sh
+
+# Test CLI
+codexbar --provider example
+codexbar -p example --source cli
+
+# Enable debug mode
+codexbar --provider example --verbose
+```
+
+## Common Patterns
+
+### Fallback Strategy Pipeline
+```swift
+ProviderFetchPlan(
+    sourceModes: [.auto, .cli, .web],
+    pipeline: ProviderFetchPipeline(resolveStrategies: { context in
+        switch context.sourceMode {
+        case .auto:
+            return [ExampleOAuthStrategy(), ExampleCLIStrategy(), ExampleWebStrategy()]
+        case .cli:
+            return [ExampleCLIStrategy()]
+        case .web:
+            return [ExampleWebStrategy()]
+        }
+    })
+)
+```
+
+### Browser Cookie Import
+```swift
+let cookies = await BrowserCookieImporter.import(
+    domains: ["example.com", "app.example.com"],
+    requiredCookieNames: ["session", "auth_token"],
+    browsers: [.safari, .chrome, .firefox]
+)
+```
+
+### Local Cost Usage
+```swift
+ProviderTokenCostConfig(
+    supportsTokenCost: true,
+    logPaths: ["~/.example/logs/**/*.jsonl"],
+    parser: ExampleCostParser(),
+    cacheKey: "example-v1"
+)
+```
+
+## UI Customization (Optional)
+
+For provider-specific UI needs, implement `ProviderImplementation`:
+
+```swift
+@ProviderImplementationRegistration
+struct ExampleProviderImplementation: ProviderImplementation {
+    var provider: UsageProvider { .example }
+    
+    func settingsView() -> AnyView {
+        AnyView(ExampleSettingsView())
+    }
+    
+    func loginFlow() async throws {
+        // Custom login flow (e.g., device flow, WebKit)
+    }
+    
+    func menuActions() -> [MenuAction] {
+        // Custom menu actions
+        return []
+    }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Descriptor not found">
+    Ensure `@ProviderDescriptorRegistration` and `@ProviderDescriptorDefinition` macros are attached to your descriptor type.
+    
+    Check that `makeDescriptor()` is implemented and returns a valid `ProviderDescriptor`.
+  </Accordion>
+
+  <Accordion title="Strategy never runs">
+    Check `isAvailable()` implementation - it may be returning `false`.
+    
+    Verify the strategy is included in the pipeline for the current source mode.
+  </Accordion>
+
+  <Accordion title="Cookies not importing">
+    Browser cookie import requires Full Disk Access permission.
+    
+    Verify the domain and cookie name filters match what the provider uses.
+    
+    Check Keychain cache for stale cookies: `cookie.<provider>` account.
+  </Accordion>
+
+  <Accordion title="Icon not showing">
+    Icon asset must be named `ProviderIcon-<id>` in `Assets.xcassets`.
+    
+    Ensure `iconResourceName` in descriptor matches the asset name.
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Providers Overview" icon="layer-group" href="/providers/overview">
+    Learn about existing providers and authentication methods
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration">
+    Configure provider settings and API keys
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Test your provider with the CLI
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    Understand CodexBar's internal structure
+  </Card>
+</CardGroup>

@@ -1,0 +1,299 @@
+---
+title: "cost Command"
+description: "Print local token cost usage without web/CLI access"
+---
+
+The `cost` command prints local token cost usage (Claude + Codex) without requiring web or CLI access. It reads token usage data from local cache files.
+
+<Note>
+  The `cost` command is only supported for **Claude** and **Codex** providers.
+</Note>
+
+## Usage
+
+```bash
+codexbar cost [OPTIONS]
+```
+
+## Options
+
+### Provider Selection
+
+<ParamField path="--provider" type="string" default="enabled providers in config">
+  Provider identifier to query. Options:
+  - `codex` - Codex token costs
+  - `claude` - Claude token costs
+  - `both` - Both Codex and Claude
+  - `all` - All providers (will skip unsupported providers with a warning)
+  
+  Falls back to defaults when config is missing.
+</ParamField>
+
+### Output Format
+
+<ParamField path="--format" type="string" default="text">
+  Output format: `text` or `json`
+</ParamField>
+
+<ParamField path="--pretty" type="flag">
+  Pretty-print JSON output (only applies when `--format json`)
+</ParamField>
+
+### Cache Options
+
+<ParamField path="--refresh" type="flag">
+  Force refresh by ignoring cached scans
+</ParamField>
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Default text output
+codexbar cost
+
+# Specific provider
+codexbar cost --provider claude
+codexbar cost --provider codex
+```
+
+### JSON Output
+
+```bash
+# JSON with pretty printing
+codexbar cost --format json --pretty
+
+# Both providers as JSON
+codexbar cost --provider both --format json --pretty
+```
+
+### Force Refresh
+
+```bash
+# Ignore cache and rescan
+codexbar cost --refresh
+codexbar cost --provider claude --format json --pretty --refresh
+```
+
+## Text Output Example
+
+```
+Claude Cost (local)
+Today: $2.45 · 125,340 tokens
+Last 30 days: $52.18 · 3,456,789 tokens
+
+Codex Cost (local)
+Today: $1.23 · 89,012 tokens
+Last 30 days: $34.56 · 2,345,678 tokens
+```
+
+## JSON Output Structure
+
+```json
+[
+  {
+    "provider": "claude",
+    "source": "local",
+    "updatedAt": "2025-12-04T18:10:22Z",
+    "sessionTokens": 125340,
+    "sessionCostUSD": 2.45,
+    "last30DaysTokens": 3456789,
+    "last30DaysCostUSD": 52.18,
+    "daily": [
+      {
+        "date": "2025-12-04",
+        "inputTokens": 85000,
+        "outputTokens": 40340,
+        "cacheReadTokens": 12000,
+        "cacheCreationTokens": 3000,
+        "totalTokens": 125340,
+        "totalCost": 2.45,
+        "modelsUsed": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
+        "modelBreakdowns": [
+          {
+            "modelName": "claude-3-5-sonnet-20241022",
+            "cost": 1.89
+          },
+          {
+            "modelName": "claude-3-opus-20240229",
+            "cost": 0.56
+          }
+        ]
+      },
+      {
+        "date": "2025-12-03",
+        "inputTokens": 102000,
+        "outputTokens": 51200,
+        "cacheReadTokens": 15000,
+        "cacheCreationTokens": 4000,
+        "totalTokens": 153200,
+        "totalCost": 3.12,
+        "modelsUsed": ["claude-3-5-sonnet-20241022"],
+        "modelBreakdowns": [
+          {
+            "modelName": "claude-3-5-sonnet-20241022",
+            "cost": 3.12
+          }
+        ]
+      }
+    ],
+    "totals": {
+      "inputTokens": 2345678,
+      "outputTokens": 1098765,
+      "cacheReadTokens": 345000,
+      "cacheCreationTokens": 98000,
+      "totalTokens": 3456789,
+      "totalCost": 52.18
+    },
+    "error": null
+  },
+  {
+    "provider": "codex",
+    "source": "local",
+    "updatedAt": "2025-12-04T18:10:22Z",
+    "sessionTokens": 89012,
+    "sessionCostUSD": 1.23,
+    "last30DaysTokens": 2345678,
+    "last30DaysCostUSD": 34.56,
+    "daily": [
+      {
+        "date": "2025-12-04",
+        "inputTokens": 60000,
+        "outputTokens": 29012,
+        "cacheReadTokens": null,
+        "cacheCreationTokens": null,
+        "totalTokens": 89012,
+        "totalCost": 1.23,
+        "modelsUsed": ["gpt-4o"],
+        "modelBreakdowns": null
+      }
+    ],
+    "totals": {
+      "inputTokens": 1567890,
+      "outputTokens": 777788,
+      "cacheReadTokens": null,
+      "cacheCreationTokens": null,
+      "totalTokens": 2345678,
+      "totalCost": 34.56
+    },
+    "error": null
+  }
+]
+```
+
+## JSON Payload Fields
+
+### Root Object
+
+<ParamField path="provider" type="string">
+  Provider identifier (`claude`, `codex`)
+</ParamField>
+
+<ParamField path="source" type="string">
+  Always `"local"` for cost command
+</ParamField>
+
+<ParamField path="updatedAt" type="string">
+  ISO 8601 timestamp of when the data was last updated
+</ParamField>
+
+<ParamField path="sessionTokens" type="number | null">
+  Token count for today's session
+</ParamField>
+
+<ParamField path="sessionCostUSD" type="number | null">
+  Cost in USD for today's session
+</ParamField>
+
+<ParamField path="last30DaysTokens" type="number | null">
+  Total token count for the last 30 days
+</ParamField>
+
+<ParamField path="last30DaysCostUSD" type="number | null">
+  Total cost in USD for the last 30 days
+</ParamField>
+
+<ParamField path="daily" type="array">
+  Array of daily usage entries (see Daily Entry fields below)
+</ParamField>
+
+<ParamField path="totals" type="object | null">
+  Aggregated totals across all days (see Totals fields below)
+</ParamField>
+
+<ParamField path="error" type="object | null">
+  Error information if the cost fetch failed
+</ParamField>
+
+### Daily Entry Object
+
+<ParamField path="date" type="string">
+  Date in `YYYY-MM-DD` format
+</ParamField>
+
+<ParamField path="inputTokens" type="number | null">
+  Number of input tokens used
+</ParamField>
+
+<ParamField path="outputTokens" type="number | null">
+  Number of output tokens generated
+</ParamField>
+
+<ParamField path="cacheReadTokens" type="number | null">
+  Number of tokens read from cache (Claude-specific)
+</ParamField>
+
+<ParamField path="cacheCreationTokens" type="number | null">
+  Number of tokens used to create cache entries (Claude-specific)
+</ParamField>
+
+<ParamField path="totalTokens" type="number | null">
+  Total tokens for the day
+</ParamField>
+
+<ParamField path="totalCost" type="number | null">
+  Total cost in USD for the day
+</ParamField>
+
+<ParamField path="modelsUsed" type="array | null">
+  List of model identifiers used on this day
+</ParamField>
+
+<ParamField path="modelBreakdowns" type="array | null">
+  Per-model cost breakdown (array of objects with `modelName` and `cost` fields)
+</ParamField>
+
+### Totals Object
+
+<ParamField path="inputTokens" type="number | null">
+  Sum of all input tokens
+</ParamField>
+
+<ParamField path="outputTokens" type="number | null">
+  Sum of all output tokens
+</ParamField>
+
+<ParamField path="cacheReadTokens" type="number | null">
+  Sum of all cache read tokens
+</ParamField>
+
+<ParamField path="cacheCreationTokens" type="number | null">
+  Sum of all cache creation tokens
+</ParamField>
+
+<ParamField path="totalTokens" type="number | null">
+  Sum of all tokens
+</ParamField>
+
+<ParamField path="totalCost" type="number | null">
+  Sum of all costs in USD
+</ParamField>
+
+## Notes
+
+- Cost usage is local-only; it does not require web/CLI provider fetches
+- The command reads cached token usage data from the app's local storage
+- If you query providers that don't support cost tracking (other than Claude/Codex), they will be skipped with a warning
+- Use `--refresh` to force a rescan of local files instead of using cached data
+- Cache-specific fields like `cacheReadTokens` and `cacheCreationTokens` are only available for Claude

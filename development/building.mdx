@@ -1,0 +1,255 @@
+---
+title: Building from Source
+description: Build CodexBar locally, run the dev loop, and test changes
+---
+
+CodexBar uses Swift Package Manager (SwiftPM) exclusively - no Xcode project required. You can build and run from the command line or open `Package.swift` in Xcode.
+
+## Prerequisites
+
+- **macOS 14+ (Sonoma)**
+- **Xcode 16+** with command line tools installed
+- **Swift 6.2+** (included with Xcode)
+- Optional: [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) and [SwiftLint](https://github.com/realm/SwiftLint) for code style
+
+## Quick Build
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/steipete/CodexBar.git
+    cd CodexBar
+    ```
+  </Step>
+  <Step title="Build release binary">
+    ```bash
+    swift build -c release
+    ```
+    Or for debug builds:
+    ```bash
+    swift build
+    ```
+  </Step>
+  <Step title="Package the app bundle">
+    ```bash
+    ./Scripts/package_app.sh
+    ```
+    This creates `CodexBar.app` in the project root with proper code signing.
+  </Step>
+  <Step title="Launch the app">
+    ```bash
+    open CodexBar.app
+    ```
+  </Step>
+</Steps>
+
+## Ad-hoc Signing
+
+If you don't have an Apple Developer account, use ad-hoc signing:
+
+```bash
+CODEXBAR_SIGNING=adhoc ./Scripts/package_app.sh
+```
+
+<Note>
+Ad-hoc signed builds won't receive Sparkle updates and will require keychain permissions on each rebuild since the signature changes.
+</Note>
+
+## Development Loop
+
+The fastest way to iterate on changes:
+
+```bash
+./Scripts/compile_and_run.sh
+```
+
+This script performs a complete dev cycle:
+
+<Steps>
+  <Step title="Kill existing instances">
+    Terminates any running CodexBar processes (debug, release, or bundled)
+  </Step>
+  <Step title="Build and test">
+    Runs `swift build` and `swift test` to catch issues early
+  </Step>
+  <Step title="Package the app">
+    Creates a fresh `CodexBar.app` bundle with updated binaries
+  </Step>
+  <Step title="Relaunch and verify">
+    Opens the app and confirms it stays running (catches immediate crashes)
+  </Step>
+</Steps>
+
+### Options
+
+```bash
+# Wait if another agent is compiling
+./Scripts/compile_and_run.sh --wait
+
+# Run tests before packaging
+./Scripts/compile_and_run.sh --test
+
+# Build with LLDB debugging enabled (debug config only)
+./Scripts/compile_and_run.sh --debug-lldb
+
+# Build universal binary (arm64 + x86_64)
+./Scripts/compile_and_run.sh --release-universal
+```
+
+## Running Tests
+
+Run the full test suite:
+
+```bash
+swift test
+```
+
+For quiet output:
+
+```bash
+swift test -q
+```
+
+Tests are located in:
+- `Tests/CodexBarTests/` - macOS-specific tests
+- `TestsLinux/` - Linux CLI tests
+
+## Build Artifacts
+
+SwiftPM places build outputs in `.build/`:
+
+```
+.build/
+├── arm64-apple-macosx/release/  # Release binaries (Apple Silicon)
+├── x86_64-apple-macosx/release/ # Release binaries (Intel)
+├── release/                      # Host architecture binaries
+└── debug/                        # Debug binaries
+```
+
+The `package_app.sh` script assembles these into `CodexBar.app`:
+
+```
+CodexBar.app/
+├── Contents/
+│   ├── MacOS/CodexBar           # Main executable
+│   ├── Helpers/
+│   │   ├── CodexBarCLI          # Bundled CLI tool
+│   │   └── CodexBarClaudeWatchdog
+│   ├── PlugIns/
+│   │   └── CodexBarWidget.appex # WidgetKit extension
+│   ├── Frameworks/
+│   │   └── Sparkle.framework    # Auto-updater
+│   ├── Resources/               # Icons and assets
+│   └── Info.plist
+```
+
+## Swift 6 Concurrency
+
+CodexBar enables **strict concurrency checking**:
+
+```swift
+swiftSettings: [
+    .enableUpcomingFeature("StrictConcurrency"),
+]
+```
+
+This means:
+
+- All code must be Sendable-safe
+- Explicit `@MainActor` required for UI code
+- Data races are caught at compile time
+- Use `@Observable` instead of `ObservableObject`
+
+## Architecture-Specific Builds
+
+By default, builds target the host architecture. To build for specific architectures:
+
+```bash
+# Build for Apple Silicon only
+swift build -c release --arch arm64
+
+# Build for Intel only
+swift build -c release --arch x86_64
+
+# Build universal binary
+swift build -c release --arch arm64
+swift build -c release --arch x86_64
+ARCHES="arm64 x86_64" ./Scripts/package_app.sh release
+```
+
+The `package_app.sh` script uses `lipo` to create universal binaries when multiple architectures are built.
+
+## Code Style
+
+CodexBar enforces consistent formatting:
+
+```bash
+# Format code
+swiftformat Sources Tests
+
+# Lint code
+swiftlint --strict
+```
+
+Install these tools:
+
+```bash
+brew install swiftformat swiftlint
+```
+
+Or use the provided script:
+
+```bash
+./Scripts/install_lint_tools.sh
+```
+
+### Style Guidelines
+
+- 4-space indentation
+- 120-character line limit
+- Explicit `self` is intentional (do not remove)
+- Maintain existing `// MARK:` organization
+
+## Cleaning Build Artifacts
+
+Force a clean build:
+
+```bash
+CODEXBAR_FORCE_CLEAN=1 ./Scripts/package_app.sh
+```
+
+Or manually:
+
+```bash
+swift package clean
+rm -rf .build
+```
+
+## Troubleshooting
+
+### App won't launch after building
+
+- Check Console.app → User Reports for crash logs
+- Verify code signature: `codesign --verify --deep --verbose CodexBar.app`
+- Try ad-hoc signing: `CODEXBAR_SIGNING=adhoc ./Scripts/package_app.sh`
+
+### "App is damaged" dialog
+
+- Extended attributes broke code seal: `xattr -cr CodexBar.app`
+- Rebuild with clean attributes: `./Scripts/package_app.sh`
+
+### Keychain prompts on every launch
+
+- Ad-hoc signing changes the signature each build
+- Use a development certificate or add CodexBar to Keychain Access → item → Access Control
+
+### Tests fail with "No such module"
+
+- Clean and rebuild: `swift package clean && swift build`
+- Ensure you're using Xcode 16+ command line tools
+
+## Next Steps
+
+- Read [Architecture](/development/architecture) to understand module structure
+- Review [Contributing Guidelines](/development/contributing) before submitting changes
+- See [RELEASING.md](https://github.com/steipete/CodexBar/blob/main/docs/RELEASING.md) for release process details

@@ -1,0 +1,358 @@
+---
+title: Usage Data Models
+description: Data structures for usage snapshots, rate windows, credits, and provider identity
+---
+
+CodexBar uses several data models to represent usage quotas, rate limits, credits, and account identity across different providers.
+
+## UsageSnapshot
+
+The primary data structure returned by all fetch strategies:
+
+<ResponseField name="primary" type="RateWindow?">
+  Primary rate limit window (e.g., 5-hour for Codex, session for Claude)
+</ResponseField>
+
+<ResponseField name="secondary" type="RateWindow?">
+  Secondary rate limit window (e.g., weekly for Codex, on-demand for Cursor)
+</ResponseField>
+
+<ResponseField name="tertiary" type="RateWindow?">
+  Optional third window (rarely used)
+</ResponseField>
+
+<ResponseField name="providerCost" type="ProviderCostSnapshot?">
+  Token-level cost tracking data
+</ResponseField>
+
+<ResponseField name="zaiUsage" type="ZaiUsageSnapshot?">
+  Zai-specific usage data
+</ResponseField>
+
+<ResponseField name="minimaxUsage" type="MiniMaxUsageSnapshot?">
+  MiniMax-specific usage data
+</ResponseField>
+
+<ResponseField name="openRouterUsage" type="OpenRouterUsageSnapshot?">
+  OpenRouter-specific usage data
+</ResponseField>
+
+<ResponseField name="cursorRequests" type="CursorRequestUsage?">
+  Cursor request tracking data
+</ResponseField>
+
+<ResponseField name="updatedAt" type="Date" required>
+  Timestamp when this snapshot was created
+</ResponseField>
+
+<ResponseField name="identity" type="ProviderIdentitySnapshot?">
+  Account identity information
+</ResponseField>
+
+### Methods
+
+#### switcherWeeklyWindow
+
+```swift
+public func switcherWeeklyWindow(
+    for provider: UsageProvider,
+    showUsed: Bool
+) -> RateWindow?
+```
+
+Returns the appropriate window to display in the provider switcher. Handles provider-specific logic:
+- **Factory**: Prefers secondary window over primary
+- **Cursor**: Falls back to On-Demand when Plan is exhausted (in "show remaining" mode only)
+- **Others**: Returns primary or falls back to secondary
+
+#### scoped
+
+```swift
+public func scoped(to provider: UsageProvider) -> UsageSnapshot
+```
+
+Returns a copy with identity scoped to the specified provider.
+
+### Example
+
+```swift
+let usage = UsageSnapshot(
+    primary: RateWindow(
+        usedPercent: 45.2,
+        windowMinutes: 300,
+        resetsAt: Date().addingTimeInterval(3600),
+        resetDescription: "1 hour"
+    ),
+    secondary: RateWindow(
+        usedPercent: 12.8,
+        windowMinutes: 10080,
+        resetsAt: Date().addingTimeInterval(86400 * 5),
+        resetDescription: "5 days"
+    ),
+    tertiary: nil,
+    updatedAt: Date(),
+    identity: ProviderIdentitySnapshot(
+        providerID: .codex,
+        accountEmail: "user@example.com",
+        accountOrganization: nil,
+        loginMethod: "chatgpt-plus"
+    )
+)
+```
+
+## RateWindow
+
+Represents a single rate limit window:
+
+<ResponseField name="usedPercent" type="Double" required>
+  Percentage of quota used (0-100)
+</ResponseField>
+
+<ResponseField name="windowMinutes" type="Int?">
+  Duration of window in minutes (e.g., 300 for 5 hours)
+</ResponseField>
+
+<ResponseField name="resetsAt" type="Date?">
+  Exact timestamp when window resets
+</ResponseField>
+
+<ResponseField name="resetDescription" type="String?">
+  Human-readable reset description (e.g., "2 hours", "tomorrow")
+</ResponseField>
+
+### Properties
+
+```swift
+public var remainingPercent: Double {
+    max(0, 100 - usedPercent)
+}
+```
+
+### Example
+
+```swift
+// Session window with exact reset time
+let sessionWindow = RateWindow(
+    usedPercent: 67.3,
+    windowMinutes: 300,
+    resetsAt: Date().addingTimeInterval(7200),
+    resetDescription: "2 hours"
+)
+
+print(sessionWindow.remainingPercent) // 32.7
+
+// Weekly window with only description
+let weeklyWindow = RateWindow(
+    usedPercent: 23.1,
+    windowMinutes: 10080,
+    resetsAt: nil,
+    resetDescription: "3 days until reset"
+)
+```
+
+## ProviderIdentitySnapshot
+
+Account identity information for a specific provider:
+
+<ResponseField name="providerID" type="UsageProvider?">
+  The provider this identity belongs to
+</ResponseField>
+
+<ResponseField name="accountEmail" type="String?">
+  Account email address
+</ResponseField>
+
+<ResponseField name="accountOrganization" type="String?">
+  Organization or workspace name
+</ResponseField>
+
+<ResponseField name="loginMethod" type="String?">
+  Login method or plan type (e.g., "chatgpt-plus", "oauth")
+</ResponseField>
+
+### Methods
+
+#### scoped
+
+```swift
+public func scoped(to provider: UsageProvider) -> ProviderIdentitySnapshot
+```
+
+Returns a copy with `providerID` set to the specified provider.
+
+<Warning>
+**Identity silo rule**: Never display identity fields from one provider in another provider's UI. Always use `scoped(to:)` or `identity(for:)` methods to enforce boundaries.
+</Warning>
+
+### Example
+
+```swift
+let identity = ProviderIdentitySnapshot(
+    providerID: .claude,
+    accountEmail: "engineer@company.com",
+    accountOrganization: "Acme Corp",
+    loginMethod: "workspace"
+)
+
+// Accessing in UI
+if let email = usage.identity(for: .claude)?.accountEmail {
+    print("Logged in as: \(email)")
+}
+```
+
+## CreditsSnapshot
+
+Credit balance and usage events:
+
+<ResponseField name="remaining" type="Double" required>
+  Remaining credit balance
+</ResponseField>
+
+<ResponseField name="events" type="[CreditEvent]" required>
+  History of credit usage events
+</ResponseField>
+
+<ResponseField name="updatedAt" type="Date" required>
+  Timestamp when snapshot was created
+</ResponseField>
+
+### CreditEvent
+
+<ResponseField name="id" type="UUID" required>
+  Unique identifier for this event
+</ResponseField>
+
+<ResponseField name="date" type="Date" required>
+  When the credits were used
+</ResponseField>
+
+<ResponseField name="service" type="String" required>
+  Service or model that consumed credits (e.g., "gpt-4", "claude-opus")
+</ResponseField>
+
+<ResponseField name="creditsUsed" type="Double" required>
+  Amount of credits consumed
+</ResponseField>
+
+### Example
+
+```swift
+let credits = CreditsSnapshot(
+    remaining: 42.50,
+    events: [
+        CreditEvent(
+            date: Date(),
+            service: "gpt-4",
+            creditsUsed: 2.30
+        ),
+        CreditEvent(
+            date: Date().addingTimeInterval(-3600),
+            service: "claude-opus-3",
+            creditsUsed: 1.75
+        )
+    ],
+    updatedAt: Date()
+)
+
+print("Credits remaining: \(credits.remaining)")
+print("Total events: \(credits.events.count)")
+```
+
+## AccountInfo
+
+Simple account information structure:
+
+<ResponseField name="email" type="String?">
+  Account email
+</ResponseField>
+
+<ResponseField name="plan" type="String?">
+  Plan type or subscription tier
+</ResponseField>
+
+### Example
+
+```swift
+let account = AccountInfo(
+    email: "user@example.com",
+    plan: "chatgpt-plus"
+)
+```
+
+## Usage Errors
+
+```swift
+public enum UsageError: LocalizedError, Sendable {
+    case noSessions
+    case noRateLimitsFound
+    case decodeFailed
+}
+```
+
+<ResponseField name="noSessions" type="UsageError">
+  No provider sessions found. User needs to run at least one prompt.
+</ResponseField>
+
+<ResponseField name="noRateLimitsFound" type="UsageError">
+  Sessions exist but no rate limit data is available yet.
+</ResponseField>
+
+<ResponseField name="decodeFailed" type="UsageError">
+  Failed to parse provider session data.
+</ResponseField>
+
+## Best Practices
+
+### Creating Usage Snapshots
+
+```swift
+// Always provide updatedAt
+let usage = UsageSnapshot(
+    primary: primaryWindow,
+    secondary: secondaryWindow,
+    updatedAt: Date(), // Current time
+    identity: identity
+)
+```
+
+### Accessing Identity Fields
+
+```swift
+// ✅ Correct: scoped access
+let email = usage.identity(for: .codex)?.accountEmail
+
+// ❌ Wrong: direct access without scoping
+let email = usage.identity?.accountEmail // May leak cross-provider data
+```
+
+### Window Selection Logic
+
+```swift
+// Use switcherWeeklyWindow for UI display
+if let window = usage.switcherWeeklyWindow(for: provider, showUsed: false) {
+    print("Remaining: \(window.remainingPercent)%")
+}
+
+// Direct window access for specific logic
+if let primary = usage.primary {
+    print("Primary window: \(primary.usedPercent)%")
+}
+```
+
+### Rate Window Display
+
+```swift
+func formatWindow(_ window: RateWindow) -> String {
+    let percent = String(format: "%.1f", window.remainingPercent)
+    if let reset = window.resetDescription {
+        return "\(percent)% remaining (resets in \(reset))"
+    } else {
+        return "\(percent)% remaining"
+    }
+}
+```
+
+## Related
+
+- [ProviderDescriptor](/api/provider-descriptor) - Learn about provider definitions
+- [Fetch Strategies](/api/provider-fetch) - See how strategies produce these models

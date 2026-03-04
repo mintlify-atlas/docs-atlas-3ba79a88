@@ -1,0 +1,144 @@
+---
+title: Architecture
+description: Module structure, entry points, and data flow in CodexBar
+---
+
+CodexBar is built with Swift 6 and SwiftPM, targeting macOS 14+. The architecture is organized into distinct modules with clear separation of concerns.
+
+## Modules
+
+CodexBar uses a multi-module architecture powered by Swift Package Manager:
+
+- **CodexBarCore**: Core functionality for fetching and parsing provider data
+  - Codex RPC client and PTY fallback
+  - Claude CLI probes and OAuth flows
+  - OpenAI web scraping utilities
+  - Status polling and provider abstractions
+  - Located at `Sources/CodexBarCore`
+
+- **CodexBar**: Main application with state management and UI
+  - `UsageStore` for provider usage/credits state
+  - `SettingsStore` for user preferences
+  - `StatusItemController` for menu bar integration
+  - Menu rendering and icon generation
+  - Located at `Sources/CodexBar`
+
+- **CodexBarWidget**: WidgetKit extension
+  - Mirrors menu card snapshots to home screen widgets
+  - Shares data via app group containers
+  - Located at `Sources/CodexBarWidget`
+
+- **CodexBarCLI**: Standalone command-line interface
+  - Bundled with the app for scripting and CI
+  - Supports `codexbar cost --provider codex|claude`
+  - Located at `Sources/CodexBarCLI`
+
+- **CodexBarMacros**: SwiftSyntax-based compile-time macros
+  - Automated provider registration
+  - Located at `Sources/CodexBarMacros`
+
+- **CodexBarMacroSupport**: Shared macro utilities
+  - Used across app, core, and CLI targets
+  - Located at `Sources/CodexBarMacroSupport`
+
+- **CodexBarClaudeWatchdog**: Helper process
+  - Ensures Claude CLI PTY sessions terminate cleanly
+  - Prevents orphaned processes on app crash/kill
+  - Located at `Sources/CodexBarClaudeWatchdog`
+
+- **CodexBarClaudeWebProbe**: Diagnostic CLI
+  - Helps troubleshoot Claude web authentication
+  - Located at `Sources/CodexBarClaudeWebProbe`
+
+## Entry Points
+
+### CodexBarApp
+
+The main SwiftUI application entry point:
+
+- Manages app lifecycle and keepalive
+- Hosts the Settings window scene
+- Uses modern `@Observable` patterns (not `ObservableObject`)
+
+### AppDelegate
+
+Handles system integration:
+
+- Wires `StatusItemController` for menu bar presence
+- Configures Sparkle updater for automatic updates
+- Manages notification permissions and delivery
+
+## Data Flow
+
+CodexBar follows a unidirectional data flow pattern:
+
+<Steps>
+  <Step title="Background refresh">
+    Timer fires based on user-configured cadence (manual, 1m, 2m, 5m, 15m, 30m)
+  </Step>
+  <Step title="Provider probes">
+    `UsageFetcher` executes provider-specific probes:
+    - Codex: RPC client or PTY fallback
+    - Claude: OAuth API or browser cookies
+    - Others: CLI commands, browser cookies, or OAuth flows
+  </Step>
+  <Step title="State update">
+    Results flow into `UsageStore`, updating:
+    - Session and weekly usage meters
+    - Credit balances
+    - Optional web dashboard data (for Codex)
+  </Step>
+  <Step title="UI rendering">
+    State changes trigger updates to:
+    - Menu bar icon (two-bar meter with error/stale dimming)
+    - Menu content (usage details, reset countdowns)
+    - WidgetKit snapshots (shared via app group)
+  </Step>
+</Steps>
+
+### Settings flow
+
+- User toggles in Settings update `SettingsStore`
+- `SettingsStore` changes affect:
+  - Refresh cadence and timing
+  - Enabled providers
+  - Feature flags (merge icons, overview tab, etc.)
+  - Authentication methods per provider
+
+## Concurrency Model
+
+CodexBar uses **Swift 6 strict concurrency** throughout:
+
+```swift
+.enableUpcomingFeature("StrictConcurrency")
+```
+
+### Best Practices
+
+- Prefer `Sendable` types for shared state
+- Use explicit `@MainActor` annotations for UI updates
+- Background fetchers run off-main to avoid blocking
+- All async operations are properly isolated
+
+### Platform Requirements
+
+- **macOS 14+ (Sonoma)** for the GUI app
+- Avoids deprecated APIs in favor of modern alternatives
+- Uses Observation framework (`@Observable`) instead of Combine
+
+## Provider Architecture
+
+Each provider implements a common protocol pattern:
+
+1. **Fetcher**: Executes provider-specific data retrieval
+2. **Parser**: Converts raw responses to structured usage data
+3. **Store integration**: Updates `UsageStore` with normalized results
+4. **Registration**: Macro-based provider discovery
+
+For details on implementing new providers, see the [Provider Authoring Guide](https://github.com/steipete/CodexBar/blob/main/docs/provider.md).
+
+## Related Documentation
+
+- [Refresh Loop](/configuration/settings) - Background update mechanics
+- [Building from Source](/development/building) - Build instructions and dev setup
+- [Contributing](/development/contributing) - Guidelines for contributors

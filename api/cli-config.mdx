@@ -1,0 +1,387 @@
+---
+title: "codexbar config"
+description: "Validate and inspect CodexBar configuration"
+---
+
+## Synopsis
+
+```bash
+codexbar config validate [OPTIONS]
+codexbar config dump [OPTIONS]
+```
+
+The `config` command provides subcommands for validating and inspecting the CodexBar configuration file at `~/.codexbar/config.json`.
+
+## Subcommands
+
+### validate
+
+Validate the configuration file for errors and warnings.
+
+```bash
+codexbar config validate [OPTIONS]
+```
+
+**Validation checks:**
+- Required fields are present
+- Field types are correct
+- Enum values are valid
+- Provider IDs are recognized
+- API keys and tokens are well-formed (format check only, not auth validation)
+- Deprecated fields or settings
+- Configuration conflicts
+
+**Exit codes:**
+- Returns `0` for valid config or warnings only
+- Returns non-zero exit code if errors are found
+
+### dump
+
+Print the normalized configuration as JSON.
+
+```bash
+codexbar config dump [OPTIONS]
+```
+
+**Output:**
+- Normalized and merged configuration (defaults + user overrides)
+- Secrets are **included** in output (use with caution)
+- Useful for debugging configuration issues
+- Always outputs JSON format
+
+## Parameters
+
+### Common Parameters
+
+<ParamField path="--format" type="string" default="text">
+  Output format for `validate` command. Options:
+  - `text` - Human-readable validation messages
+  - `json` - Machine-readable JSON array of validation issues
+  
+  Note: `dump` always outputs JSON.
+</ParamField>
+
+<ParamField path="--pretty" type="boolean">
+  Pretty-print JSON output with indentation.
+</ParamField>
+
+<ParamField path="--json-only" type="boolean">
+  Suppress non-JSON output; errors become JSON payloads.
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean">
+  Enable verbose logging.
+</ParamField>
+
+<ParamField path="--log-level" type="string">
+  Set log level: `trace`, `verbose`, `debug`, `info`, `warning`, `error`, or `critical`.
+</ParamField>
+
+<ParamField path="--json-output" type="boolean">
+  Emit machine-readable JSONL logs on stderr.
+</ParamField>
+
+<ParamField path="--no-color" type="boolean">
+  Disable ANSI colors in text output.
+</ParamField>
+
+<ParamField path="-h, --help" type="boolean">
+  Show help message.
+</ParamField>
+
+## Response Fields
+
+### validate - JSON Output Structure
+
+Returns an array of validation issues:
+
+<ResponseField name="severity" type="string" required>
+  Issue severity: `error` or `warning`.
+  
+  - `error`: Configuration is invalid and may cause runtime failures
+  - `warning`: Configuration is valid but not recommended (deprecated fields, etc.)
+</ResponseField>
+
+<ResponseField name="provider" type="string">
+  Provider ID associated with the issue (e.g., `claude`, `codex`), or `null` for global config issues.
+</ResponseField>
+
+<ResponseField name="field" type="string">
+  Configuration field path where the issue was found (e.g., `providers.claude.apiKey`).
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Human-readable description of the validation issue.
+</ResponseField>
+
+### dump - JSON Output Structure
+
+<ResponseField name="providers" type="object" required>
+  Provider-specific configuration keyed by provider ID.
+  
+  <Expandable title="provider config fields">
+    <ResponseField name="enabled" type="boolean">
+      Whether the provider is enabled.
+    </ResponseField>
+    
+    <ResponseField name="order" type="integer">
+      Display order in menubar (lower numbers appear first).
+    </ResponseField>
+    
+    <ResponseField name="apiKey" type="string">
+      API key for providers that use API authentication.
+    </ResponseField>
+    
+    <ResponseField name="tokens" type="array">
+      Multi-account token configurations.
+      
+      <ResponseField name="label" type="string">
+        Account label or email.
+      </ResponseField>
+      
+      <ResponseField name="sessionKey" type="string">
+        Session cookie value.
+      </ResponseField>
+      
+      <ResponseField name="accessToken" type="string">
+        OAuth access token (Claude only).
+      </ResponseField>
+    </ResponseField>
+    
+    <ResponseField name="source" type="string">
+      Default data source: `auto`, `web`, `cli`, `oauth`, or `api`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="preferences" type="object">
+  Global preferences.
+  
+  <Expandable title="preferences fields">
+    <ResponseField name="resetTimeDisplay" type="string">
+      How to display reset times: `countdown` or `absolute`.
+    </ResponseField>
+    
+    <ResponseField name="statusPageChecks" type="boolean">
+      Enable automatic status page checks.
+    </ResponseField>
+    
+    <ResponseField name="updateCheckInterval" type="integer">
+      Update check interval in seconds.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="version" type="integer">
+  Configuration file format version.
+</ResponseField>
+
+## Examples
+
+### Validate configuration (text format)
+
+```bash
+codexbar config validate
+```
+
+**Output (valid config):**
+```
+Config: OK
+```
+
+**Output (with issues):**
+```
+[WARNING] claude (tokens): Token at index 1 has invalid sessionKey format
+[ERROR] copilot (apiKey): Missing required API key
+[WARNING] config: Deprecated field 'legacyMode' should be removed
+```
+
+### Validate configuration (JSON format)
+
+```bash
+codexbar config validate --format json --pretty
+```
+
+**Output:**
+```json
+[
+  {
+    "severity": "warning",
+    "provider": "claude",
+    "field": "tokens",
+    "message": "Token at index 1 has invalid sessionKey format"
+  },
+  {
+    "severity": "error",
+    "provider": "copilot",
+    "field": "apiKey",
+    "message": "Missing required API key"
+  },
+  {
+    "severity": "warning",
+    "provider": null,
+    "field": null,
+    "message": "Deprecated field 'legacyMode' should be removed"
+  }
+]
+```
+
+### Dump normalized configuration
+
+```bash
+codexbar config dump --pretty
+```
+
+**Output:**
+```json
+{
+  "version": 1,
+  "providers": {
+    "codex": {
+      "enabled": true,
+      "order": 0,
+      "source": "auto"
+    },
+    "claude": {
+      "enabled": true,
+      "order": 1,
+      "source": "auto",
+      "tokens": [
+        {
+          "label": "steipete@gmail.com",
+          "sessionKey": "sk-ant-..."
+        },
+        {
+          "label": "work@company.com",
+          "accessToken": "sk-ant-oat..."
+        }
+      ]
+    },
+    "copilot": {
+      "enabled": true,
+      "order": 2,
+      "apiKey": "ghp_xxxxxxxxxxxxxxxxxxxx",
+      "source": "api"
+    },
+    "gemini": {
+      "enabled": false,
+      "order": 3,
+      "apiKey": "AIza...",
+      "source": "api"
+    },
+    "kilo": {
+      "enabled": true,
+      "order": 4,
+      "source": "auto"
+    }
+  },
+  "preferences": {
+    "resetTimeDisplay": "countdown",
+    "statusPageChecks": true,
+    "updateCheckInterval": 3600
+  }
+}
+```
+
+### Validate and exit with code
+
+```bash
+codexbar config validate
+if [ $? -eq 0 ]; then
+  echo "Configuration is valid"
+else
+  echo "Configuration has errors"
+  exit 1
+fi
+```
+
+### Dump config for debugging
+
+```bash
+codexbar config dump --pretty > /tmp/config-debug.json
+```
+
+### Machine-readable validation
+
+```bash
+codexbar config validate --json-only --format json
+```
+
+## Exit Codes
+
+- **0**: Success (valid configuration or warnings only for `validate`)
+- **1**: Failure (configuration errors found for `validate`, or unexpected error for `dump`)
+- **3**: Parse/format error (malformed JSON in config file)
+
+## Notes
+
+### Configuration File
+
+- Location: `~/.codexbar/config.json`
+- Created automatically on first run if not present
+- JSON format with schema validation
+- See `docs/configuration.md` in the repository for full schema documentation
+
+### Validation Scope
+
+**What is validated:**
+- JSON syntax and structure
+- Required fields presence
+- Field type correctness (string, integer, boolean, array, object)
+- Enum value validity (e.g., `source` must be `auto`, `web`, `cli`, `oauth`, or `api`)
+- Provider ID recognition
+- Token/API key format (structure only, not authentication)
+- Deprecated fields and settings
+
+**What is NOT validated:**
+- API key authentication (use `codexbar --provider <id>` to test)
+- Network connectivity
+- Provider CLI binary availability
+- Browser cookie access permissions
+- Actual token validity (format check only)
+
+### Warnings vs Errors
+
+**Errors** indicate invalid configuration that will cause runtime failures:
+- Missing required fields
+- Invalid field types
+- Unrecognized enum values
+- Malformed JSON
+
+**Warnings** indicate valid but non-ideal configuration:
+- Deprecated fields (still functional but may be removed in future)
+- Unusual settings that might indicate user error
+- Missing optional recommended fields
+
+### Security Warning
+
+- The `dump` command outputs **sensitive secrets** including API keys and session tokens
+- Do not share the output publicly or commit it to version control
+- Use redirection to write to a secure file if needed: `codexbar config dump > /tmp/config.json`
+- Consider using `jq` to redact secrets: `codexbar config dump | jq '.providers | with_entries(.value.apiKey = "[REDACTED]")' `
+
+### Common Validation Issues
+
+**Missing API keys:**
+```
+[ERROR] copilot (apiKey): Missing required API key
+```
+Solution: Add `"apiKey": "ghp_..."` to the provider config or set `COPILOT_API_TOKEN` environment variable.
+
+**Invalid token format:**
+```
+[WARNING] claude (tokens): Token at index 0 has invalid sessionKey format
+```
+Solution: Ensure `sessionKey` starts with `sk-ant-sid01-` or `accessToken` starts with `sk-ant-oat-`.
+
+**Provider not enabled:**
+```
+[WARNING] gemini: Provider is disabled but has configuration
+```
+Solution: Set `"enabled": true` or remove the provider configuration.
+
+**Deprecated fields:**
+```
+[WARNING] config: Deprecated field 'legacyMode' should be removed
+```
+Solution: Remove the deprecated field from the configuration file.

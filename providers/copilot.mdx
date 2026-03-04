@@ -1,0 +1,174 @@
+---
+title: Copilot Provider
+description: Track GitHub Copilot usage with device flow OAuth
+---
+
+The Copilot provider tracks usage for GitHub Copilot using GitHub OAuth device flow and the Copilot internal usage API.
+
+## Features
+
+- Premium interactions quota tracking
+- Chat quota tracking
+- Device flow OAuth (no browser cookies needed)
+- Plan label from Copilot subscription
+- Status page integration with GitHub incidents
+
+## Authentication Method
+
+Copilot uses GitHub OAuth device flow for authentication. No browser cookies are required.
+
+<Tabs>
+  <Tab title="Device Flow Setup">
+    ### GitHub OAuth Device Flow
+
+    **Setup:**
+    1. Preferences → Providers → Copilot → Enable
+    2. Click "Login to Copilot" or "Add Account"
+    3. CodexBar displays a device code
+    4. Visit the GitHub URL shown (e.g., https://github.com/login/device)
+    5. Enter the device code
+    6. Authorize CodexBar
+    7. Token is saved to `~/.codexbar/config.json`
+
+    **How it works:**
+    1. **Device code request**:
+       ```
+       POST https://github.com/login/device/code
+       ```
+    2. **Token polling**:
+       ```
+       POST https://github.com/login/oauth/access_token
+       ```
+       Polls until user authorizes or times out.
+    3. **Token storage**:
+       - Stored in `~/.codexbar/config.json` → `providers[].apiKey` for `copilot`
+
+    **Scope:**
+    - `read:user` - Read user profile information
+  </Tab>
+
+  <Tab title="Manual Token Entry">
+    ### Manual Token Configuration
+
+    If device flow doesn't work, you can manually configure a GitHub token.
+
+    **Setup:**
+    1. Create a GitHub personal access token:
+       - Visit https://github.com/settings/tokens/new
+       - Scope: `read:user`
+       - Generate token
+    2. Edit `~/.codexbar/config.json`:
+       ```json
+       {
+         "providers": [
+           {
+             "id": "copilot",
+             "apiKey": "ghp_..."
+           }
+         ]
+       }
+       ```
+    3. Restart CodexBar
+
+    **Note:** Classic tokens may not work with the Copilot internal API. Device flow tokens are recommended.
+  </Tab>
+</Tabs>
+
+## API Endpoints
+
+### Usage Fetch
+```
+GET https://api.github.com/copilot_internal/user
+```
+
+**Headers:**
+- `Authorization: token <github_oauth_token>`
+- `Accept: application/json`
+- `Editor-Version: vscode/1.96.2`
+- `Editor-Plugin-Version: copilot-chat/0.26.7`
+- `User-Agent: GitHubCopilotChat/0.26.7`
+- `X-Github-Api-Version: 2025-04-01`
+
+**Returns:**
+- `quotaSnapshots.premiumInteractions` - Premium interactions quota
+- `quotaSnapshots.chat` - Chat quota
+- `copilotPlan` - Plan label
+
+## Snapshot Mapping
+
+CodexBar displays Copilot usage as follows:
+
+- **Primary meter**: Premium interactions percent remaining → converted to used percent
+- **Secondary meter**: Chat percent remaining → converted to used percent
+- **Plan label**: From `copilotPlan` field
+- **Reset dates**: Not provided by the API
+
+## Status Page Integration
+
+CodexBar monitors [GitHub Status](https://www.githubstatus.com) for incidents:
+
+- Polls Statuspage.io API every 5 minutes (configurable)
+- Displays incident badge on menu bar icon
+- Shows incident details in menu
+- Click "View Status" to open status page
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Device flow times out">
+    You didn't authorize the device code in time.
+    
+    **Solution:**
+    1. Click "Login to Copilot" again to get a new device code
+    2. Visit the GitHub URL immediately
+    3. Enter the device code within the time limit (usually 15 minutes)
+  </Accordion>
+
+  <Accordion title="Token unauthorized (401)">
+    The GitHub token is invalid or doesn't have the required scope.
+    
+    **Solution:**
+    1. Delete the token: edit `~/.codexbar/config.json` and remove `copilot` entry
+    2. Restart CodexBar
+    3. Login again using device flow
+    4. Or create a new personal access token with `read:user` scope
+  </Accordion>
+
+  <Accordion title="No quota data returned">
+    The Copilot internal API may not be returning quota snapshots.
+    
+    **Solution:**
+    1. Verify you have an active Copilot subscription
+    2. Check that you've used Copilot recently (API may not return data for inactive accounts)
+    3. Wait a few minutes and refresh
+  </Accordion>
+
+  <Accordion title="API version header mismatch">
+    GitHub may have changed the required API version header.
+    
+    **Solution:**
+    1. Check the latest Editor-Version and Editor-Plugin-Version from VS Code
+    2. Report the issue with the new version values
+  </Accordion>
+</AccordionGroup>
+
+## CLI Usage
+
+```bash
+# Show Copilot usage
+codexbar --provider copilot
+codexbar -p copilot
+```
+
+## Key Files
+
+- **Usage fetcher**: `Sources/CodexBarCore/Providers/Copilot/CopilotUsageFetcher.swift`
+- **Device flow**: `Sources/CodexBarCore/Providers/Copilot/CopilotDeviceFlow.swift`
+- **Login flow**: `Sources/CodexBar/Providers/Copilot/CopilotLoginFlow.swift`
+- **Token store**: `Sources/CodexBar/CopilotTokenStore.swift` (legacy migration helper)
+
+## Related Documentation
+
+- [Configuration](/configuration/config-file) - Config file format
+- [CLI Reference](/cli/overview) - CLI usage and options
+- [Provider Authoring](/providers/authoring) - How providers work internally

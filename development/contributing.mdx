@@ -1,0 +1,282 @@
+---
+title: Contributing
+description: Guidelines for contributing to CodexBar development
+---
+
+CodexBar welcomes contributions! Whether you're fixing bugs, adding features, or improving documentation, this guide will help you get started.
+
+## Getting Started
+
+<Steps>
+  <Step title="Fork and clone">
+    Fork the repository on GitHub and clone your fork:
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/CodexBar.git
+    cd CodexBar
+    ```
+  </Step>
+  <Step title="Set up development environment">
+    Install dependencies and verify the build:
+    ```bash
+    ./Scripts/compile_and_run.sh
+    ```
+    See [Building from Source](/development/building) for detailed setup instructions.
+  </Step>
+  <Step title="Create a feature branch">
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+  </Step>
+</Steps>
+
+## Project Guidelines
+
+### Code Style
+
+CodexBar enforces consistent formatting with SwiftFormat and SwiftLint:
+
+```bash
+# Format your changes
+swiftformat Sources Tests
+
+# Check for lint issues
+swiftlint --strict
+```
+
+Key conventions:
+- **4-space indentation** (not tabs)
+- **120-character line limit**
+- **Explicit `self`** is intentional - do not remove
+- Maintain existing `// MARK:` section organization
+- Use descriptive variable/function names
+
+### Testing Requirements
+
+All code changes must include tests:
+
+- Add test cases to `Tests/CodexBarTests/` for new features
+- Use the pattern `FeatureNameTests.swift` with `test_caseDescription` method names
+- Run tests before committing: `swift test`
+- Add fixtures for new parsing/formatting scenarios
+
+```swift
+final class UsageParserTests: XCTestCase {
+    func test_parsesCodexUsageCorrectly() {
+        // Test implementation
+    }
+}
+```
+
+### Commit Guidelines
+
+Write clear, concise commit messages:
+
+- Use imperative mood: "Add feature" not "Added feature"
+- Keep the first line under 72 characters
+- Focus on *why* rather than *what*
+- Reference issues when relevant: "Fix icon dimming (#123)"
+
+Good examples:
+```bash
+git commit -m "Improve Claude usage probe reliability"
+git commit -m "Fix icon dimming when provider is stale"
+git commit -m "Add support for Gemini quota API"
+```
+
+### Module Organization
+
+CodexBar is organized into focused modules. Keep changes scoped appropriately:
+
+- **CodexBarCore**: Fetching, parsing, provider logic
+- **CodexBar**: State management, UI, menu bar integration
+- **CodexBarCLI**: Command-line interface
+- **Scripts/**: Build and release automation
+- **docs/**: Project documentation
+
+Do not mix concerns across modules. For example, UI code belongs in `CodexBar`, not `CodexBarCore`.
+
+## Development Workflow
+
+### Making Changes
+
+<Steps>
+  <Step title="Write code">
+    Make your changes following the code style guidelines. Keep changes focused and scoped to a single feature or fix.
+  </Step>
+  <Step title="Add tests">
+    Write test cases for new functionality in `Tests/CodexBarTests/`:
+    ```bash
+    swift test
+    ```
+  </Step>
+  <Step title="Verify build and lint">
+    Run the development loop to catch issues:
+    ```bash
+    ./Scripts/compile_and_run.sh --test
+    swiftformat Sources Tests
+    swiftlint --strict
+    ```
+  </Step>
+  <Step title="Test manually">
+    Launch the app and verify your changes work as expected:
+    ```bash
+    open CodexBar.app
+    ```
+  </Step>
+</Steps>
+
+### After Code Changes
+
+**Important**: Always rebuild and relaunch after editing code:
+
+```bash
+./Scripts/compile_and_run.sh
+```
+
+This ensures:
+- Old processes are killed (prevents stale binaries)
+- Fresh build is packaged
+- App relaunches with your changes
+- Crashes are caught immediately
+
+Do not skip this step - running a stale binary will lead to confusion about whether your changes work.
+
+## Pull Request Process
+
+### Before Submitting
+
+<Accordion title="Pre-submission checklist">
+  - [ ] All tests pass: `swift test`
+  - [ ] Code is formatted: `swiftformat Sources Tests`
+  - [ ] No lint issues: `swiftlint --strict`
+  - [ ] App builds and runs: `./Scripts/compile_and_run.sh`
+  - [ ] Manual testing completed for your changes
+  - [ ] Commit messages are clear and descriptive
+  - [ ] Changes are scoped to a single feature/fix
+</Accordion>
+
+### Submitting Your PR
+
+<Steps>
+  <Step title="Push to your fork">
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+  </Step>
+  <Step title="Create pull request">
+    Open a PR on GitHub with:
+    - **Clear title** describing the change
+    - **Summary** of what changed and why
+    - **Testing** details: commands run, manual tests performed
+    - **Screenshots/GIFs** for UI changes
+    - **Related issue** link if applicable
+  </Step>
+  <Step title="Address feedback">
+    Respond to review comments and push updates:
+    ```bash
+    git add .
+    git commit -m "Address review feedback"
+    git push origin feature/your-feature-name
+    ```
+  </Step>
+</Steps>
+
+### PR Template
+
+```markdown
+## Summary
+Brief description of the change and motivation.
+
+## Changes
+- Added X feature
+- Fixed Y bug
+- Improved Z behavior
+
+## Testing
+- Ran `swift test` - all pass
+- Manual testing: [describe what you tested]
+- Verified on macOS 14.x
+
+## Screenshots
+[If UI changes, include before/after screenshots]
+
+## Related Issues
+Fixes #123
+```
+
+## Provider Development
+
+Adding a new provider? Follow these guidelines:
+
+1. **Read the provider authoring guide**: [docs/provider.md](https://github.com/steipete/CodexBar/blob/main/docs/provider.md)
+2. **Implement the provider protocol**: Create fetcher, parser, and store integration
+3. **Add provider icon**: Place in `Sources/CodexBar/Resources/`
+4. **Test thoroughly**: Add test cases for parsing and error handling
+5. **Document authentication**: Explain how users configure credentials
+
+See existing providers in `Sources/CodexBarCore/` for reference implementations.
+
+## Swift 6 Concurrency
+
+CodexBar uses **Swift 6 strict concurrency**. Follow these patterns:
+
+```swift
+// Use @Observable instead of ObservableObject
+@Observable
+class UsageStore {
+    var usage: Usage?
+}
+
+// Mark UI code with @MainActor
+@MainActor
+func updateIcon() {
+    // UI updates here
+}
+
+// Make shared types Sendable
+struct Usage: Sendable {
+    let session: Int
+    let weekly: Int
+}
+```
+
+### Concurrency Rules
+
+- Use `Sendable` for types crossing isolation boundaries
+- Avoid `@unchecked Sendable` unless absolutely necessary
+- Prefer `async`/`await` over completion handlers
+- Run background work off the main actor
+- Use `@MainActor` for all UI updates
+
+## Code Review Standards
+
+Reviewers look for:
+
+- **Correctness**: Does it solve the problem?
+- **Testing**: Are tests comprehensive?
+- **Style**: Does it follow project conventions?
+- **Performance**: Are there any bottlenecks?
+- **Concurrency**: Is it Sendable-safe?
+- **Scope**: Is the change focused and minimal?
+
+Be open to feedback and iterate on your changes.
+
+## Release Process
+
+Contributors don't need to handle releases, but for context:
+
+- Releases use `Scripts/release.sh` for end-to-end automation
+- Binaries are notarized via App Store Connect API
+- Updates are distributed via Sparkle and Homebrew
+- See [RELEASING.md](https://github.com/steipete/CodexBar/blob/main/docs/RELEASING.md) for the full process
+
+## Getting Help
+
+- **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/steipete/CodexBar/issues)
+- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/steipete/CodexBar/discussions)
+- **Architecture**: Read [Architecture](/development/architecture) for module structure
+- **Building**: See [Building from Source](/development/building) for dev setup
+
+## License
+
+By contributing to CodexBar, you agree that your contributions will be licensed under the MIT License. See [LICENSE](https://github.com/steipete/CodexBar/blob/main/LICENSE) for details.

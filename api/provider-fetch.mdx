@@ -1,0 +1,333 @@
+---
+title: Provider Fetch Strategies
+description: Fetch plans, pipelines, and strategies that define how providers retrieve usage data
+---
+
+CodexBar uses a flexible strategy pattern to fetch usage data from different sources. Each provider defines a fetch plan with an ordered pipeline of strategies that are tried in sequence until one succeeds.
+
+## Overview
+
+The fetch system has three layers:
+1. **Fetch Plan**: Declares which source modes are supported
+2. **Fetch Pipeline**: Resolves and executes strategies in priority order
+3. **Fetch Strategies**: Individual implementations that fetch from specific sources
+
+## Source Modes
+
+```swift
+public enum ProviderSourceMode: String, CaseIterable, Sendable, Codable {
+    case auto   // Try all available strategies in order
+    case web    // Web scraping or browser cookies
+    case cli    // Command-line interface
+    case oauth  // OAuth API access
+    case api    // API token access
+}
+```
+
+### Source Mode Filtering
+
+- **App runtime**: Always uses `.auto` mode (tries all strategies)
+- **CLI runtime**: Respects `--source` flag to filter strategies
+- Strategies check `context.sourceMode` to determine availability
+
+## ProviderFetchPlan
+
+<ParamField path="sourceModes" type="Set<ProviderSourceMode>" required>
+  Set of source modes this provider supports
+</ParamField>
+
+<ParamField path="pipeline" type="ProviderFetchPipeline" required>
+  The strategy resolution and execution pipeline
+</ParamField>
+
+```swift
+public struct ProviderFetchPlan: Sendable {
+    public let sourceModes: Set<ProviderSourceMode>
+    public let pipeline: ProviderFetchPipeline
+    
+    public func fetchOutcome(
+        context: ProviderFetchContext,
+        provider: UsageProvider
+    ) async -> ProviderFetchOutcome
+}
+```
+
+## ProviderFetchPipeline
+
+The pipeline resolves strategies dynamically based on the fetch context:
+
+```swift
+public struct ProviderFetchPipeline: Sendable {
+    public let resolveStrategies: @Sendable (ProviderFetchContext) async -> [any ProviderFetchStrategy]
+    
+    public func fetch(
+        context: ProviderFetchContext,
+        provider: UsageProvider
+    ) async -> ProviderFetchOutcome
+}
+```
+
+### Pipeline Execution
+
+1. Resolve strategies for the current context
+2. For each strategy in order:
+   - Check if strategy is available
+   - If available, attempt to fetch
+   - If successful, return result immediately
+   - If error occurs and `shouldFallback` returns true, continue to next strategy
+   - If error occurs and `shouldFallback` returns false, return error
+3. If no strategies succeed, return `ProviderFetchError.noAvailableStrategy`
+
+## ProviderFetchStrategy Protocol
+
+<ParamField path="id" type="String" required>
+  Unique identifier for this strategy (e.g., "claude.cli", "codex.web")
+</ParamField>
+
+<ParamField path="kind" type="ProviderFetchKind" required>
+  The kind of fetch this strategy performs
+</ParamField>
+
+### Required Methods
+
+#### isAvailable
+
+```swift
+func isAvailable(_ context: ProviderFetchContext) async -> Bool
+```
+
+Determines if this strategy can be used in the given context. Check for:
+- Installed CLI binaries
+- Available browser cookies
+- API tokens in settings
+- Source mode compatibility
+
+#### fetch
+
+```swift
+func fetch(_ context: ProviderFetchContext) async throws -> ProviderFetchResult
+```
+
+Executes the fetch and returns usage data. Should be timeout-bounded.
+
+#### shouldFallback
+
+```swift
+func shouldFallback(on error: Error, context: ProviderFetchContext) -> Bool
+```
+
+Determines if the pipeline should try the next strategy after this error. Return:
+- `true`: Try next strategy (soft error like "CLI not found")
+- `false`: Stop immediately (hard error like "authentication failed")
+
+## ProviderFetchKind
+
+```swift
+public enum ProviderFetchKind: Sendable {
+    case cli           // Command-line interface
+    case web           // Browser cookies
+    case oauth         // OAuth API
+    case apiToken      // API token
+    case localProbe    // Local process inspection
+    case webDashboard  // Web scraping with WebView
+}
+```
+
+## ProviderFetchContext
+
+Context passed to all strategies containing runtime configuration:
+
+<ResponseField name="runtime" type="ProviderRuntime">
+  Whether running in app or CLI mode
+</ResponseField>
+
+<ResponseField name="sourceMode" type="ProviderSourceMode">
+  Requested source mode (auto, web, cli, oauth, api)
+</ResponseField>
+
+<ResponseField name="includeCredits" type="Bool">
+  Whether to fetch credit information
+</ResponseField>
+
+<ResponseField name="webTimeout" type="TimeInterval">
+  Timeout for web operations
+</ResponseField>
+
+<ResponseField name="verbose" type="Bool">
+  Whether to log verbose debug info
+</ResponseField>
+
+<ResponseField name="settings" type="ProviderSettingsSnapshot?">
+  Provider-specific settings
+</ResponseField>
+
+<ResponseField name="fetcher" type="UsageFetcher">
+  Shared fetcher for Codex-specific operations
+</ResponseField>
+
+<ResponseField name="browserDetection" type="BrowserDetection">
+  Browser cookie detection helper
+</ResponseField>
+
+## ProviderFetchResult
+
+<ResponseField name="usage" type="UsageSnapshot" required>
+  The fetched usage data
+</ResponseField>
+
+<ResponseField name="credits" type="CreditsSnapshot?">
+  Credit information if available
+</ResponseField>
+
+<ResponseField name="dashboard" type="OpenAIDashboardSnapshot?">
+  Dashboard data for OpenAI providers
+</ResponseField>
+
+<ResponseField name="sourceLabel" type="String" required>
+  Human-readable label for data source (e.g., "cli", "web")
+</ResponseField>
+
+<ResponseField name="strategyID" type="String" required>
+  ID of strategy that produced this result
+</ResponseField>
+
+<ResponseField name="strategyKind" type="ProviderFetchKind" required>
+  Kind of strategy that produced this result
+</ResponseField>
+
+## ProviderFetchOutcome
+
+Complete result of a fetch attempt including all strategy attempts:
+
+<ResponseField name="result" type="Result<ProviderFetchResult, Error>" required>
+  Success or failure result
+</ResponseField>
+
+<ResponseField name="attempts" type="[ProviderFetchAttempt]" required>
+  History of all strategy attempts
+</ResponseField>
+
+### ProviderFetchAttempt
+
+<ResponseField name="strategyID" type="String">
+  ID of attempted strategy
+</ResponseField>
+
+<ResponseField name="kind" type="ProviderFetchKind">
+  Kind of strategy attempted
+</ResponseField>
+
+<ResponseField name="wasAvailable" type="Bool">
+  Whether strategy reported itself as available
+</ResponseField>
+
+<ResponseField name="errorDescription" type="String?">
+  Error message if fetch failed
+</ResponseField>
+
+## Example: Implementing a Strategy
+
+```swift
+struct ClaudeCLIStrategy: ProviderFetchStrategy {
+    let id: String = "claude.cli"
+    let kind: ProviderFetchKind = .cli
+    
+    func isAvailable(_ context: ProviderFetchContext) async -> Bool {
+        // Check if source mode allows CLI
+        guard context.sourceMode == .auto || context.sourceMode == .cli else {
+            return false
+        }
+        
+        // Check if claude binary is installed
+        guard let binary = TTYCommandRunner.which("claude") else {
+            return false
+        }
+        
+        return true
+    }
+    
+    func fetch(_ context: ProviderFetchContext) async throws -> ProviderFetchResult {
+        // Execute CLI command with timeout
+        let runner = TTYCommandRunner(
+            command: "claude status --json",
+            timeout: context.webTimeout
+        )
+        
+        let output = try await runner.run()
+        let data = output.data(using: .utf8)!
+        let parsed = try JSONDecoder().decode(ClaudeStatusResponse.self, from: data)
+        
+        // Convert to UsageSnapshot
+        let usage = UsageSnapshot(
+            primary: RateWindow(
+                usedPercent: parsed.usedPercent,
+                windowMinutes: 300,
+                resetsAt: parsed.resetsAt,
+                resetDescription: nil
+            ),
+            secondary: nil,
+            updatedAt: Date(),
+            identity: ProviderIdentitySnapshot(
+                providerID: .claude,
+                accountEmail: parsed.email,
+                accountOrganization: nil,
+                loginMethod: nil
+            )
+        )
+        
+        return makeResult(
+            usage: usage,
+            sourceLabel: "cli"
+        )
+    }
+    
+    func shouldFallback(on error: Error, context: ProviderFetchContext) -> Bool {
+        // Fallback to web strategy if CLI fails
+        return true
+    }
+}
+```
+
+## Example: Multi-Strategy Pipeline
+
+```swift
+ProviderFetchPlan(
+    sourceModes: [.auto, .web, .cli, .api],
+    pipeline: ProviderFetchPipeline(
+        resolveStrategies: { context in
+            var strategies: [any ProviderFetchStrategy] = []
+            
+            // Prefer API if token available
+            if context.settings?.hasAPIToken == true {
+                strategies.append(ProviderAPIStrategy())
+            }
+            
+            // Try CLI if installed
+            strategies.append(ProviderCLIStrategy())
+            
+            // Fall back to web scraping
+            strategies.append(ProviderWebStrategy())
+            
+            return strategies
+        }
+    )
+)
+```
+
+## Best Practices
+
+<Tip>
+Order strategies by reliability and speed: API tokens > CLI > Web scraping
+</Tip>
+
+- Implement timeout bounds for all network and subprocess operations
+- Check `context.sourceMode` in `isAvailable` to respect CLI flags
+- Return `true` from `shouldFallback` for recoverable errors (missing binary, no cookies)
+- Return `false` from `shouldFallback` for auth failures (don't spam other strategies)
+- Use descriptive `strategyID` values for debugging (e.g., "claude.cli.status")
+- Provide helpful error messages that guide users to fix the issue
+
+## Related
+
+- [ProviderDescriptor](/api/provider-descriptor) - Learn about provider definitions
+- [Usage Models](/api/usage-models) - Understand data structures returned by strategies

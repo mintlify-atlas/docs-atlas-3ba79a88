@@ -1,0 +1,215 @@
+---
+title: Cursor Provider
+description: Track Cursor usage with browser cookies or stored WebKit session
+---
+
+The Cursor provider tracks usage for the Cursor code editor, fetching usage and billing data via browser cookies or a stored WebKit session.
+
+## Features
+
+- Plan usage tracking (included plan)
+- On-demand usage tracking (individual usage)
+- Billing cycle window with reset date
+- Automatic and manual cookie authentication
+- WebKit-based login flow for session storage
+- Status page integration with Cursor incidents
+
+## Authentication Methods
+
+Cursor is web-only and uses browser cookies for authentication:
+
+<Tabs>
+  <Tab title="Automatic (Recommended)">
+    ### Automatic Cookie Import
+
+    CodexBar automatically imports cookies from your browsers.
+
+    **Setup:**
+    1. Preferences → Providers → Cursor → Enable
+    2. Cookie source is set to "Automatic" by default
+    3. Log in to Cursor in any supported browser
+
+    **Cookie Import Order:**
+    - Safari: `~/Library/Cookies/Cookies.binarycookies`
+    - Chrome/Chromium: `~/Library/Application Support/Google/Chrome/*/Cookies`
+    - Firefox: `~/Library/Application Support/Firefox/Profiles/*/cookies.sqlite`
+
+    **Domains:**
+    - `cursor.com`
+    - `cursor.sh`
+
+    **Required Cookies:**
+    Any one of these cookies is sufficient:
+    - `WorkosCursorSessionToken`
+    - `__Secure-next-auth.session-token`
+    - `next-auth.session-token`
+
+    **Caching:**
+    - Cached in Keychain (`com.steipete.codexbar.cache`, account `cookie.cursor`)
+    - Reused until session is invalid
+  </Tab>
+
+  <Tab title="Manual Cookie Entry">
+    ### Manual Cookie Header
+
+    If automatic import doesn't work, you can manually paste a cookie header.
+
+    **Setup:**
+    1. Preferences → Providers → Cursor → Cookie source → Manual
+    2. Visit https://cursor.com in your browser and log in
+    3. Open Developer Tools (F12 or Cmd+Option+I)
+    4. Go to Network tab and reload the page
+    5. Click any request to cursor.com
+    6. Copy the entire `Cookie:` header value
+    7. Paste into CodexBar settings
+
+    **Example format:**
+    ```
+    WorkosCursorSessionToken=wos-session-...; __Secure-next-auth.session-token=...
+    ```
+  </Tab>
+
+  <Tab title="Stored WebKit Session">
+    ### WebKit Session Storage
+
+    CodexBar can store a WebKit session from the "Add Account" login flow.
+
+    **How it works:**
+    1. Click "Add Account" in Settings → Providers → Cursor
+    2. CodexBar opens a WebKit view to https://cursor.com
+    3. Log in with your Cursor account
+    4. Session cookies are captured and stored locally
+
+    **Storage location:**
+    - `~/Library/Application Support/CodexBar/cursor-session.json`
+
+    **Teardown:**
+    - Uses `WebKitTeardown` to avoid Intel WebKit crashes
+
+    **When to use:**
+    - Automatic cookie import fails
+    - You don't want to manually copy cookies
+    - You want a persistent session independent of browser state
+  </Tab>
+</Tabs>
+
+## Data Source Fallback Order
+
+1. **Cached cookie header** (preferred)
+   - Keychain cache: `com.steipete.codexbar.cache`, account `cookie.cursor`
+
+2. **Browser cookie import**
+   - Safari → Chrome → Firefox (default order)
+   - Can be customized via provider metadata
+
+3. **Stored session cookies** (fallback)
+   - From WebKit login flow
+   - Stored at `~/Library/Application Support/CodexBar/cursor-session.json`
+
+## API Endpoints
+
+CodexBar fetches data from the following Cursor APIs:
+
+### Usage Summary
+```
+GET https://cursor.com/api/usage-summary
+```
+**Returns:**
+- Plan usage (included)
+- On-demand usage
+- Billing cycle window
+
+### Authentication
+```
+GET https://cursor.com/api/auth/me
+```
+**Returns:**
+- User email
+- User name
+
+### Legacy Usage (Request-Based)
+```
+GET https://cursor.com/api/usage?user=ID
+```
+**Returns:**
+- Request counts + limits (legacy format)
+
+## Snapshot Mapping
+
+CodexBar displays Cursor usage as follows:
+
+- **Primary meter**: Plan usage percent (included plan)
+- **Secondary meter**: On-demand usage percent (individual usage)
+- **Provider cost**: On-demand usage USD (limit when known)
+- **Reset**: Billing cycle end date
+
+## Status Page Integration
+
+CodexBar monitors [Cursor Status](https://status.cursor.sh) for incidents:
+
+- Polls Statuspage.io API every 5 minutes (configurable)
+- Displays incident badge on menu bar icon
+- Shows incident details in menu
+- Click "View Status" to open status page
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No session cookies found">
+    You're not logged into Cursor in any supported browser.
+    
+    **Solution:**
+    1. Open https://cursor.com in Safari, Chrome, or Firefox
+    2. Log in with your Cursor account
+    3. Return to CodexBar and click "Refresh"
+    4. Or use Manual mode to paste a cookie header
+  </Accordion>
+
+  <Accordion title="Session cookie expired">
+    Cursor session cookies expire periodically.
+    
+    **Solution:**
+    1. Visit https://cursor.com in your browser
+    2. Log out and log back in
+    3. Return to CodexBar - fresh cookies will be imported automatically
+    4. Or use "Add Account" to create a stored WebKit session
+  </Accordion>
+
+  <Accordion title="Full Disk Access required">
+    Safari cookie import requires Full Disk Access permission.
+    
+    **Solution:**
+    1. System Settings → Privacy & Security → Full Disk Access
+    2. Enable CodexBar
+    3. Restart CodexBar
+    4. Or use Chrome/Firefox cookies (no special permission needed)
+  </Accordion>
+
+  <Accordion title="WebKit login crashes on Intel Mac">
+    Intel Macs may experience WebKit crashes during login teardown.
+    
+    **Solution:**
+    - CodexBar uses `WebKitTeardown` to minimize crashes
+    - If crashes persist, use Manual cookie entry instead
+    - Or import cookies from Chrome/Firefox (no WebKit involved)
+  </Accordion>
+</AccordionGroup>
+
+## CLI Usage
+
+```bash
+# Show Cursor usage
+codexbar --provider cursor
+codexbar -p cursor
+```
+
+## Key Files
+
+- **Status probe**: `Sources/CodexBarCore/Providers/Cursor/CursorStatusProbe.swift`
+- **Login flow**: `Sources/CodexBar/CursorLoginRunner.swift`
+
+## Related Documentation
+
+- [Cookie Management](/configuration/permissions) - Browser cookie import details
+- [CLI Reference](/cli/overview) - CLI usage and options
+- [Provider Authoring](/providers/authoring) - How providers work internally

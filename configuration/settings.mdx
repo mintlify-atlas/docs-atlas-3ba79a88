@@ -1,0 +1,208 @@
+---
+title: App Settings
+description: Configure CodexBar's behavior, refresh cadence, UI preferences, and menu bar display options.
+---
+
+## Overview
+
+CodexBar provides extensive customization options through its Settings interface. Configure refresh intervals, provider toggles, menu bar display modes, and advanced debug options.
+
+## General Settings
+
+### Refresh Cadence
+
+Control how frequently CodexBar checks for usage updates:
+
+- **Manual** - Updates only when you click "Refresh" in the menu
+- **1 min** - Updates every 60 seconds
+- **2 min** - Updates every 2 minutes (recommended for active development)
+- **5 min** - Default; balanced between freshness and API load
+- **15 min** - Conservative refresh for low-priority monitoring
+- **30 min** - Minimal refresh for background awareness
+
+<Tip>
+Use Manual mode when debugging provider authentication issues to avoid hitting rate limits.
+</Tip>
+
+### Launch at Login
+
+Automatically start CodexBar when you log in to macOS. The app runs as a menu bar utility with no Dock icon.
+
+<Accordion title="Troubleshooting launch at login">
+If CodexBar doesn't launch automatically:
+
+1. Open **System Settings** → **General** → **Login Items**
+2. Verify CodexBar is listed under "Open at Login"
+3. If missing, toggle "Launch at Login" off and on in CodexBar Settings
+4. Restart your Mac to test
+
+**macOS 13+ requirement**: Login Items must be enabled via System Settings.
+</Accordion>
+
+## Provider Settings
+
+### Enable/Disable Providers
+
+Toggle individual providers on or off from Settings → Providers. Disabled providers:
+- Don't appear in the menu bar (unless Merge Icons is enabled)
+- Don't consume refresh cycles
+- Keep their configuration saved in `config.json`
+
+Enabled by default:
+- Codex, Claude, Cursor, Gemini, Copilot, OpenRouter
+
+Disabled by default:
+- Antigravity, Factory (Droid), z.ai, Kimi, Kimi K2, Kiro, MiniMax, Vertex AI, Augment, Amp, JetBrains AI, Ollama, Synthetic, Warp
+
+### Provider Order
+
+Reorder providers by dragging them in Settings → Providers. The order controls:
+- Menu bar icon sequence (when Merge Icons is off)
+- Provider switcher order (when Merge Icons is on)
+- Display order in the Overview tab
+
+## Menu Bar Settings
+
+### Merge Icons
+
+Combine all enabled providers into a single menu bar item with a provider switcher.
+
+**When enabled:**
+- One status item in the menu bar
+- Click to open the provider switcher
+- Optional Overview tab showing up to 3 providers at once
+- Saves menu bar space
+
+**When disabled:**
+- Each enabled provider gets its own menu bar icon
+- Direct access to individual provider menus
+- More granular status visibility
+
+<Tip>
+Enable Merge Icons if you track 3+ providers to avoid menu bar clutter.
+</Tip>
+
+### Reset Time Display
+
+**Relative (default)**: Shows countdown timers (e.g., "resets in 3h 24m")
+
+**Absolute**: Shows exact reset times (e.g., "resets at 2:30 PM")
+
+### Usage Bar Display
+
+**Show Used (default)**: Bars represent how much quota you've consumed
+
+**Show Remaining**: Bars represent remaining quota (inverted)
+
+### Menu Bar Metric Preference
+
+Per-provider setting for what the menu bar icon percentage represents:
+
+- **Automatic** - Uses the most relevant metric (session for most providers, weekly for Claude)
+- **Primary** - Always show session/5-hour window
+- **Secondary** - Always show weekly window (when available)
+- **Average** - Show average of available metrics
+
+## Advanced Settings
+
+### Status Checks
+
+Enable polling of provider status pages to detect incidents. When enabled:
+- Checks status.anthropic.com, status.openai.com, etc.
+- Displays incident badges in the menu
+- Adds status overlay icons to menu bar items
+
+Disable if you don't want external status API calls.
+
+### Session Quota Notifications
+
+Show macOS notifications when session quotas are exhausted or restored.
+
+<Warning>
+Notifications require macOS permission. Check **System Settings** → **Notifications** → **CodexBar** if alerts don't appear.
+</Warning>
+
+### Show Optional Credits and Extra Usage
+
+Display additional usage details when available:
+- Credits balance for credit-based providers
+- Bonus credits for Kiro
+- Extra usage metrics from web dashboards
+
+Disable to simplify the menu display.
+
+### Hide Personal Info
+
+Redact personally identifiable information from the UI:
+- Email addresses
+- Account identifiers
+- API key prefixes
+
+Useful when sharing screenshots or presenting.
+
+### Cost Usage Tracking
+
+Enable local cost tracking by parsing JSONL logs:
+- Codex: `~/.codex/logs/`
+- Claude: `~/.claude/logs/`
+
+Shows token cost summary for the last 30 days in the menu.
+
+## Debug Settings
+
+<Accordion title="Debug menu options">
+### Debug Menu Enabled
+
+Adds a "Debug" section to the main menu with:
+- Refresh logs
+- Strategy attempts
+- Provider fetch diagnostics
+- Config validation
+
+### File Logging
+
+Writes detailed logs to `~/Library/Logs/CodexBar/codexbar.log`.
+
+### Log Level
+
+- **Error** - Only errors
+- **Warning** - Errors + warnings
+- **Info** - General informational messages
+- **Debug** - Detailed debug messages
+- **Verbose** - All messages including trace-level
+
+### Keep CLI Sessions Alive
+
+Prevents CLI process termination after usage probes. Useful for debugging CLI integration issues.
+
+### Disable Keychain Access
+
+Bypass Keychain reads/writes for testing. Stored tokens and cookies won't be accessible.
+
+<Warning>
+This setting is for debugging only. Normal operation requires Keychain access for secure credential storage.
+</Warning>
+</Accordion>
+
+## Provider-Specific Settings
+
+Each provider has dedicated settings available from Settings → Providers → [Provider Name]:
+
+- **Source mode** - Auto, Web, CLI, OAuth, or API (varies by provider)
+- **Cookie source** - Auto (browser import), Manual (paste cookie header), or Off
+- **API keys** - For providers with API token support
+- **Region** - Provider-specific region overrides (z.ai, MiniMax)
+- **Workspace ID** - For multi-workspace providers (OpenCode)
+
+See individual provider documentation for details:
+- [Codex](/providers/codex)
+- [Claude](/providers/claude)
+- [Cursor](/providers/cursor)
+- [Gemini](/providers/gemini)
+- And more in the Providers section
+
+## Exporting Settings
+
+All provider configurations are stored in `~/.codexbar/config.json`. See [Config File Reference](/configuration/config-file) for the schema and examples.
+
+App preferences (refresh cadence, UI settings) are stored in macOS UserDefaults and are not directly editable.

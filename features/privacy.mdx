@@ -1,0 +1,185 @@
+---
+title: "Privacy & Security"
+description: "On-device parsing, browser cookie opt-in, and no password storage—CodexBar keeps your data private and secure"
+---
+
+## Privacy-First Design
+
+CodexBar is designed with privacy as a core principle. All usage parsing happens locally on your device, and the app never stores passwords or transmits sensitive data to external servers.
+
+<CardGroup cols={2}>
+  <Card title="On-Device Parsing" icon="microchip">
+    All data processing happens locally—no cloud services involved
+  </Card>
+  <Card title="Browser Cookies Opt-In" icon="cookie-bite">
+    Cookie access is optional and requires explicit user permission
+  </Card>
+  <Card title="No Password Storage" icon="lock">
+    CodexBar reuses existing sessions; passwords never touch the app
+  </Card>
+  <Card title="Minimal Data Access" icon="shield-check">
+    Only reads known locations for enabled features
+  </Card>
+</CardGroup>
+
+## What CodexBar Reads
+
+CodexBar does **not** crawl your filesystem. It only accesses a small set of known locations when related features are enabled:
+
+### Browser Cookies & Local Storage
+- **When**: You enable cookie-based providers (Cursor, Droid, Amp) and grant permission
+- **What**: Session cookies from Safari, Chrome, Firefox, Edge, Brave, or Arc
+- **Why**: To reuse your existing browser sessions without requiring separate login
+- **Cached**: Cookies are stored in Keychain and reused until invalid to minimize prompts
+
+### Local JSONL Logs
+- **When**: Cost tracking features are enabled for Codex or Claude
+- **What**: `~/.codex/sessions/**/*.jsonl` and `~/.config/claude/projects/**/*.jsonl`
+- **Why**: To calculate token costs over the last 30 days
+- **Privacy**: Logs are parsed locally; no data leaves your machine
+
+### CLI Credentials
+- **When**: You use CLI-based providers (Codex, Claude, Gemini, Kiro)
+- **What**: OAuth tokens or session files created by official provider CLIs
+- **Why**: To query usage data without requiring separate authentication
+
+### Local Configuration
+- **When**: Using providers with local probes (Antigravity, JetBrains AI)
+- **What**: Language server endpoints or IDE XML quota files
+- **Why**: To read usage data directly from running applications
+
+<Info>
+See the [audit notes in issue #12](https://github.com/steipete/CodexBar/issues/12) for a detailed discussion of file access.
+</Info>
+
+## macOS Permissions Explained
+
+CodexBar requests permissions only when necessary for specific features. Here's what each permission is used for:
+
+### Full Disk Access (Optional)
+
+<Warning>
+**Only required** if you use Safari cookies for web-based providers (Codex web, Claude web, Cursor, Droid/Factory).
+</Warning>
+
+- **Why**: Safari stores cookies in protected locations that require Full Disk Access
+- **Alternative**: Use Chrome/Firefox cookies or CLI-only sources instead
+- **What we access**: Safari's `Cookies.binarycookies` and LocalStorage databases
+- **What we don't access**: Any other files or directories
+
+### Keychain Access (Prompted by macOS)
+
+CodexBar uses Keychain to securely store and retrieve credentials:
+
+#### Browser Cookie Decryption
+- **Chrome Safe Storage**: Required to decrypt Chrome cookies
+- **Also applies to**: Brave, Edge, Arc (Chromium-based browsers)
+- **Firefox**: Direct access; no decryption key needed
+
+#### Provider Credentials
+- **Claude OAuth**: Reads `Claude Code-credentials` written by Claude CLI
+- **z.ai API token**: Stored from Settings → Providers
+- **Copilot token**: Stored during GitHub device flow
+- **OpenRouter API token**: Stored from provider configuration
+
+#### Cookie Cache
+- **Account**: `com.steipete.codexbar.cache`
+- **Items**: `cookie.<provider>` entries
+- **Purpose**: Reuse browser cookies without repeated Keychain prompts
+
+### Preventing Keychain Prompts
+
+To stop Keychain Access alerts:
+
+<Steps>
+  <Step title="Open Keychain Access.app">
+    Launch Keychain Access from Applications → Utilities
+  </Step>
+  <Step title="Find the Item">
+    Search for the keychain item (e.g., "Claude Code-credentials" or "Chrome Safe Storage")
+  </Step>
+  <Step title="Edit Access Control">
+    Double-click the item → **Access Control** tab
+  </Step>
+  <Step title="Add CodexBar">
+    Click the **+** button and add `CodexBar.app` to "Always allow access by these applications"
+  </Step>
+  <Step title="Save and Relaunch">
+    Click **Save Changes** and restart CodexBar
+  </Step>
+</Steps>
+
+<Tip>
+Prefer adding just CodexBar to the access list. Avoid "Allow all applications" unless you want system-wide access.
+</Tip>
+
+![Keychain Access Control Example](https://github.com/steipete/CodexBar/raw/main/docs/keychain-allow.png)
+
+### Files & Folders Prompts
+
+CodexBar launches provider CLIs (`codex`, `claude`, `gemini`, `antigravity`) which may trigger folder access prompts:
+
+- **Why**: If a CLI reads a project directory or external drive, macOS asks CodexBar for permission
+- **Example**: Desktop folder access when `codex` operates in `~/Desktop/project`
+- **Not**: Background disk scanning—these prompts are driven by CLI working directories
+
+### Permissions We Don't Request
+
+<Check>CodexBar does **not** require:</Check>
+
+- Screen Recording
+- Accessibility access
+- Automation permissions
+- Camera or microphone
+- Location services
+
+## No Passwords Stored
+
+CodexBar **never** asks for or stores passwords:
+
+- **Browser cookies**: Reuses your existing authenticated sessions
+- **OAuth flows**: Handled by official provider CLIs (Claude, Copilot, Gemini)
+- **API tokens**: You provide tokens generated from provider dashboards
+- **CLI authentication**: Leverages credentials you've already set up with official tools
+
+## Disabling Keychain Access
+
+If you prefer not to grant Keychain access:
+
+1. Open Settings → Advanced
+2. Enable "Disable Keychain access"
+3. Manually paste Cookie headers in Settings → Providers for web-based providers
+4. Note: Claude OAuth and z.ai API token features won't work without Keychain
+
+<Warning>
+Disabling Keychain access limits functionality for providers that require secure credential storage.
+</Warning>
+
+## Data Transmission
+
+CodexBar communicates with provider APIs only to fetch usage data:
+
+- **What's sent**: Authentication tokens or cookies (same as your browser/CLI)
+- **What's received**: Usage limits, credits, reset times, and status information
+- **What's not sent**: Code, files, or any data unrelated to usage queries
+- **No telemetry**: CodexBar doesn't collect analytics or usage statistics about you
+
+## Open Source Transparency
+
+CodexBar is fully open source under the MIT license:
+
+- **Source code**: [github.com/steipete/CodexBar](https://github.com/steipete/CodexBar)
+- **Audit the code**: Review exactly what the app does and doesn't do
+- **Community review**: Security researchers and developers can inspect the implementation
+- **Build from source**: Compile your own copy if you prefer
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Multi-Provider Support" icon="grid" href="/features/multi-provider">
+    See authentication methods for all providers
+  </Card>
+  <Card title="Menu Bar Interface" icon="bars" href="/features/menu-bar">
+    Learn about the menu bar visualization
+  </Card>
+</CardGroup>

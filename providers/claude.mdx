@@ -1,0 +1,266 @@
+---
+title: Claude Provider
+description: Track Anthropic Claude usage with OAuth API, browser cookies, and CLI fallback
+---
+
+The Claude provider tracks usage for Anthropic's Claude coding assistant, supporting multiple authentication methods with automatic fallback.
+
+## Features
+
+- Session (5-hour) and weekly rate limit tracking
+- Model-specific windows (Sonnet, Opus, Haiku)
+- Extra usage cost tracking (monthly spend/limit)
+- Local token cost analysis from project logs
+- Multi-account support via manual tokens
+- Status page integration with Anthropic incidents
+
+## Authentication Methods
+
+Claude supports three primary authentication methods with automatic fallback:
+
+<Tabs>
+  <Tab title="OAuth API (Recommended)">
+    ### OAuth API
+
+    The OAuth API is the preferred method when Claude CLI credentials include `user:profile` scope.
+
+    **Setup:**
+    1. Install Claude CLI: `npm install -g @anthropic-ai/claude-cli`
+    2. Authenticate: `claude auth login`
+    3. Credentials saved to Keychain (`Claude Code-credentials`) or `~/.claude/.credentials.json`
+
+    **API Details:**
+    - Endpoint: `GET https://api.anthropic.com/api/oauth/usage`
+    - Authentication: `Authorization: Bearer <access_token>`
+    - Header: `anthropic-beta: oauth-2025-04-20`
+
+    **Keychain Prompt Policy:**
+    Control when CodexBar prompts for Keychain access:
+    - **Never prompt** - Never attempts interactive prompts
+    - **Only on user action** (default) - Prompts only for user-initiated repairs
+    - **Always allow prompts** - Allows prompts in background flows
+
+    Settings → Providers → Claude → Keychain prompt policy
+
+    **What it provides:**
+    - `five_hour` → session window
+    - `seven_day` → weekly window
+    - `seven_day_sonnet` / `seven_day_opus` → model-specific weekly windows
+    - `extra_usage` → monthly spend/limit
+    - Plan inference from `rate_limit_tier` (Max/Pro/Team/Enterprise)
+  </Tab>
+
+  <Tab title="Web API (Cookies)">
+    ### Web API with Browser Cookies
+
+    Uses browser session cookies to call Claude web APIs.
+
+    **Setup:**
+    1. Preferences → Providers → Claude → Cookie source
+    2. Choose "Automatic" (imports from browser) or "Manual" (paste cookie header)
+
+    **Cookie Import:**
+    - Domain: `claude.ai`
+    - Required cookie: `sessionKey` (value prefix `sk-ant-...`)
+    - Browser order: Safari → Chrome → Firefox
+    - Cached in Keychain (`com.steipete.codexbar.cache`, account `cookie.claude`)
+
+    **Multi-Account Manual Tokens:**
+    1. Add entries to `~/.codexbar/config.json` (`tokenAccounts`)
+    2. Set Claude cookies to Manual
+    3. Menu shows all accounts stacked or via switcher bar
+    4. Preferences → Advanced → Display
+
+    **Token Formats:**
+    - Session key: `sessionKey=sk-ant-...`
+    - OAuth token: `sk-ant-oat...` (uses OAuth endpoint)
+    - Full cookie header: `Cookie: sessionKey=...; other=...`
+
+    **API Endpoints:**
+    - `GET https://claude.ai/api/organizations` → org UUID
+    - `GET https://claude.ai/api/organizations/{orgId}/usage` → session/weekly/opus
+    - `GET https://claude.ai/api/organizations/{orgId}/overage_spend_limit` → Extra usage
+    - `GET https://claude.ai/api/account` → email + plan hints
+  </Tab>
+
+  <Tab title="CLI PTY (Fallback)">
+    ### CLI PTY Fallback
+
+    Runs Claude in an interactive terminal session when OAuth and Web APIs are unavailable.
+
+    **How it works:**
+    1. Launches `claude` in a PTY session (`ClaudeCLISession`)
+    2. Auto-responds to first-run prompts (trust files, workspace, telemetry)
+    3. Sends `/usage`, waits for rendered panel
+    4. Optionally sends `/status` to extract identity fields
+
+    **Settings:**
+    - Debug → "Keep CLI sessions alive" to persist sessions between probes
+
+    **Parsing:**
+    - Strips ANSI escape codes
+    - Locates "Current session" and "Current week" headers
+    - Extracts percent left/used and reset text
+    - Parses `Account:` and `Org:` lines when present
+    - Surfaces CLI errors (e.g., token expired)
+  </Tab>
+</Tabs>
+
+## Data Source Selection
+
+### Default Selection (Debug Menu Disabled)
+
+1. **OAuth API** - If Claude CLI credentials include `user:profile` scope
+2. **CLI PTY** - If OAuth is unavailable or fails
+3. **Web API** - If OAuth and CLI are unavailable or fail
+
+### Manual Override
+
+Preferences → Providers → Claude → Usage source:
+- **Auto** - Uses the default selection above
+- **OAuth** - Forces OAuth API only
+- **Web** - Forces Web API with cookies
+- **CLI** - Forces CLI PTY only
+
+## Local Cost Usage
+
+CodexBar scans local project logs to compute token costs:
+
+**Source roots:**
+- `$CLAUDE_CONFIG_DIR` (comma-separated paths, each uses `<root>/projects`)
+- Fallback roots:
+  - `~/.config/claude/projects`
+  - `~/.claude/projects`
+
+**Files:**
+- `**/*.jsonl` under project roots
+
+**Parsing:**
+- Lines with `type: "assistant"` and `message.usage`
+- Per-model token counts (input, cache read/create, output)
+- Deduplicates streaming chunks by `message.id + requestId`
+
+**Cache:**
+- `~/Library/Caches/CodexBar/cost-usage/claude-v1.json`
+- Window: last 30 days (rolling), 60s minimum refresh interval
+
+**View cost summary:**
+1. Settings → General → Show cost summary
+2. Menu shows "Cost (30d): $X.XX" below usage meters
+
+## Multi-Account Support
+
+CodexBar supports multiple Claude accounts via manual tokens:
+
+**Setup:**
+1. Edit `~/.codexbar/config.json`:
+```json
+{
+  "tokenAccounts": [
+    {
+      "name": "Work",
+      "token": "sessionKey=sk-ant-..."
+    },
+    {
+      "name": "Personal",
+      "token": "sk-ant-oat..."
+    }
+  ]
+}
+```
+2. Preferences → Providers → Claude → Cookie source: Manual
+3. Preferences → Advanced → Display: choose "Stacked" or "Switcher"
+
+**Display modes:**
+- **Stacked** - Shows all accounts in the menu
+- **Switcher** - Shows one account at a time with a switcher bar
+
+## Status Page Integration
+
+CodexBar monitors [Anthropic Status](https://status.anthropic.com) for incidents:
+
+- Polls Statuspage.io API every 5 minutes (configurable)
+- Displays incident badge on menu bar icon
+- Shows incident details in menu
+- Click "View Status" to open status page
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="OAuth token missing user:profile scope">
+    Claude CLI tokens with only `user:inference` scope cannot call the usage API.
+    
+    **Solution:**
+    1. Re-authenticate: `claude auth logout && claude auth login`
+    2. Ensure the new token includes `user:profile` scope
+    3. Or use Web API with browser cookies instead
+  </Accordion>
+
+  <Accordion title="Session key expired">
+    Browser session keys expire periodically.
+    
+    **Solution:**
+    1. Visit https://claude.ai in your browser
+    2. Log out and log back in
+    3. Return to CodexBar and click "Refresh"
+    4. CodexBar will import fresh cookies automatically
+  </Accordion>
+
+  <Accordion title="CLI PTY parsing failed">
+    The Claude CLI status output may change formats.
+    
+    **Solution:**
+    1. Try OAuth API or Web API instead
+    2. Preferences → Providers → Claude → Usage source: OAuth or Web
+    3. Report the issue with CLI output attached
+  </Accordion>
+
+  <Accordion title="Keychain prompts for credentials">
+    Claude OAuth credentials stored in Keychain may trigger prompts.
+    
+    **Solution:**
+    1. Open Keychain Access.app
+    2. Search for "Claude Code-credentials"
+    3. Open the item → Access Control
+    4. Add CodexBar.app to "Always allow access by these applications"
+    5. Or adjust Keychain prompt policy in Settings → Providers → Claude
+  </Accordion>
+
+  <Accordion title="No cost data showing">
+    Cost summary requires local Claude project logs.
+    
+    **Solution:**
+    1. Verify Claude projects exist: `ls ~/.config/claude/projects` or `ls ~/.claude/projects`
+    2. Ensure Claude CLI has been used recently (logs from last 30 days)
+    3. Enable cost summary: Settings → General → Show cost summary
+  </Accordion>
+</AccordionGroup>
+
+## CLI Usage
+
+```bash
+# Show Claude usage
+codexbar --provider claude
+codexbar -p claude
+
+# Force specific source
+codexbar -p claude --source oauth
+codexbar -p claude --source web
+codexbar -p claude --source cli
+
+# Show cost summary
+codexbar cost --provider claude
+```
+
+## Key Files
+
+- **OAuth**: `Sources/CodexBarCore/Providers/Claude/ClaudeOAuth/*`
+- **Web API**: `Sources/CodexBarCore/Providers/Claude/ClaudeWeb/ClaudeWebAPIFetcher.swift`
+- **CLI PTY**: `Sources/CodexBarCore/Providers/Claude/ClaudeStatusProbe.swift`, `Sources/CodexBarCore/Providers/Claude/ClaudeCLISession.swift`
+- **Cost usage**: `Sources/CodexBarCore/CostUsageFetcher.swift`, `Sources/CodexBarCore/Vendored/CostUsage/*`
+
+## Related Documentation
+
+- [Multi-Account Setup](/configuration/config-file) - Configure multiple accounts
+- [CLI Reference](/cli/overview) - CLI usage and options
+- [Provider Authoring](/providers/authoring) - How providers work internally

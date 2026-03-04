@@ -1,0 +1,266 @@
+---
+title: macOS Permissions
+description: Understand and configure the permissions CodexBar needs for Full Disk Access, Keychain, and Files & Folders access.
+---
+
+## Overview
+
+CodexBar requests specific macOS permissions to access browser cookies, CLI credentials, and local logs. This page explains what each permission does, why it's needed, and how to configure it.
+
+<Note>
+CodexBar does **not** request Screen Recording, Accessibility, or Automation permissions. It does not store passwords or scan your filesystem.
+</Note>
+
+## Full Disk Access (Optional)
+
+### What It Does
+
+Full Disk Access allows CodexBar to read Safari cookies and local storage.
+
+### When It's Needed
+
+Only required if you use **Safari** for web-based providers:
+- Codex web dashboard extras (OpenAI cookies)
+- Claude web authentication
+- Cursor browser session
+- Factory (Droid) browser session
+- Augment browser session
+- Amp browser session
+
+### When It's Not Needed
+
+- **Chrome/Firefox users**: CodexBar can read Chrome and Firefox cookies without Full Disk Access
+- **CLI-only users**: If you authenticate via CLI tools (codex, claude, gemini), you don't need this permission
+- **OAuth users**: Claude OAuth and Gemini OAuth don't require browser cookies
+
+### How to Enable
+
+1. Open **System Settings** → **Privacy & Security** → **Full Disk Access**
+2. Click the **+** button (you may need to unlock with your password)
+3. Navigate to `/Applications/CodexBar.app`
+4. Select CodexBar and click **Open**
+5. Ensure the checkbox next to CodexBar is enabled
+6. Restart CodexBar
+
+<Warning>
+Full Disk Access is a powerful permission. Only grant it if you need Safari cookie access. Chrome/Firefox users should skip this.
+</Warning>
+
+## Keychain Access (Prompted by macOS)
+
+### What It Does
+
+Keychain Access allows CodexBar to read and write encrypted credentials stored in your macOS Keychain.
+
+### When It's Needed
+
+CodexBar uses Keychain for:
+
+1. **Browser cookie decryption**
+   - Chrome stores encrypted cookies using a "Chrome Safe Storage" key in Keychain
+   - Brave, Edge, and Arc have similar safe storage keys
+   - CodexBar reads these keys to decrypt cookies
+
+2. **Claude OAuth credentials**
+   - The Claude CLI stores OAuth tokens in Keychain
+   - CodexBar reads the "Claude Code-credentials" item
+
+3. **API token storage**
+   - z.ai API token (from Settings → Providers → z.ai)
+   - Copilot API token (from device flow authentication)
+   - OpenRouter API token
+   - Other provider API keys
+
+### Stopping Keychain Alerts
+
+macOS prompts for Keychain access every time CodexBar reads a credential. To grant permanent access:
+
+#### For Claude OAuth Credentials
+
+1. Open **Keychain Access.app** (in `/Applications/Utilities/`)
+2. Select the **login** keychain in the left sidebar
+3. Search for **"Claude Code-credentials"**
+4. Double-click the item to open it
+5. Go to the **Access Control** tab
+6. Under "Always allow access by these applications," click **+**
+7. Navigate to `/Applications/CodexBar.app` and click **Open**
+8. Click **Save Changes**
+9. Relaunch CodexBar
+
+<Frame>
+  <img src="https://github.com/steipete/CodexBar/raw/main/docs/keychain-allow.png" alt="Keychain Access Control settings showing CodexBar added to allowed applications" />
+</Frame>
+
+#### For Chrome Safe Storage
+
+1. Open **Keychain Access.app**
+2. Select the **login** keychain
+3. Search for **"Chrome Safe Storage"** (or "Brave Safe Storage", "Microsoft Edge Safe Storage", etc.)
+4. Double-click the item
+5. Go to the **Access Control** tab
+6. Click **+** and add `/Applications/CodexBar.app`
+7. Click **Save Changes**
+8. Relaunch CodexBar
+
+<Accordion title="For Brave, Edge, Arc, and other browsers">
+- **Brave**: Search for "Brave Safe Storage"
+- **Microsoft Edge**: Search for "Microsoft Edge Safe Storage"
+- **Arc**: Search for "Arc Safe Storage"
+- **Firefox**: Firefox uses a separate encryption mechanism; search for "Firefox"
+
+Follow the same steps as Chrome Safe Storage.
+</Accordion>
+
+<Warning>
+**Security Note**: Only add CodexBar.app to the allowed applications list. Avoid selecting "Allow all applications to access this item" unless you fully understand the security implications.
+</Warning>
+
+### Alternative: Disable Keychain Access
+
+If you don't want to grant Keychain access:
+
+1. Disable browser cookie imports (use Manual cookie entry instead)
+2. Use CLI authentication for Claude (OAuth credentials won't be accessible)
+3. Enter API tokens directly in the config file instead of Settings UI
+
+See [Config File Reference](/configuration/config-file) for manual configuration.
+
+## Files & Folders Access
+
+### What It Does
+
+Files & Folders permission allows CodexBar to access specific directories outside its sandbox.
+
+### When It's Needed
+
+CodexBar launches provider CLIs (codex, claude, gemini, antigravity) to fetch usage data. If those CLIs:
+- Read a project directory on your Desktop
+- Access files on an external drive
+- Use a configuration file in a restricted location
+
+macOS prompts CodexBar to request access to that folder or volume.
+
+### What Gets Requested
+
+Common prompts include:
+- **Desktop** - If a CLI's working directory is on the Desktop
+- **Documents** - If a CLI reads from ~/Documents
+- **External Volumes** - If a CLI accesses an external drive
+
+### Why This Happens
+
+CodexBar doesn't scan your filesystem. The prompts appear because:
+1. CodexBar launches a CLI tool (e.g., `codex` or `claude`)
+2. The CLI attempts to read a file in a restricted directory
+3. macOS attributes the file access to CodexBar (the parent process)
+4. macOS prompts for folder access
+
+<Note>
+This is macOS sandboxing behavior, not a CodexBar limitation. The same prompts would appear if you ran the CLI from any sandboxed app.
+</Note>
+
+### How to Manage
+
+**To grant access:**
+1. Click **OK** when macOS prompts for folder access
+2. The permission is remembered for future CLI invocations
+
+**To revoke access:**
+1. Open **System Settings** → **Privacy & Security** → **Files and Folders**
+2. Find **CodexBar** in the list
+3. Toggle off any folders you want to revoke
+
+**To avoid prompts:**
+- Use web-based or OAuth authentication instead of CLI
+- Run CLIs from a directory CodexBar already has access to (e.g., your home directory)
+
+## Privacy Audit
+
+CodexBar's disk access is limited to known locations:
+
+### Browser Cookies and Local Storage
+- Chrome: `~/Library/Application Support/Google/Chrome/Default/Cookies`
+- Brave: `~/Library/Application Support/BraveSoftware/Brave-Browser/Default/Cookies`
+- Firefox: `~/Library/Application Support/Firefox/Profiles/*/cookies.sqlite`
+- Safari: `~/Library/Safari/LocalStorage/` (requires Full Disk Access)
+- Arc: `~/Library/Application Support/Arc/User Data/Default/Cookies`
+
+### Provider Logs
+- Codex: `~/.codex/logs/*.jsonl`
+- Claude: `~/.claude/logs/*.jsonl`
+
+### CLI Binaries
+- Standard `$PATH` locations: `/usr/local/bin`, `/opt/homebrew/bin`, etc.
+- Provider-specific locations (e.g., Gemini CLI, Antigravity language server)
+
+### Keychain Items
+- "Chrome Safe Storage" and browser equivalents
+- "Claude Code-credentials"
+- Provider API tokens (stored by CodexBar)
+
+For a full discussion of privacy and disk access, see [GitHub issue #12](https://github.com/steipete/CodexBar/issues/12).
+
+## What CodexBar Does NOT Access
+
+- **Screen Recording**: CodexBar doesn't capture your screen
+- **Accessibility**: No monitoring of keystrokes or UI elements
+- **Automation**: No scripting of other applications
+- **Network traffic**: No packet inspection or SSL interception
+- **Filesystem scanning**: No recursive directory traversal or file indexing
+- **Password storage**: Browser cookies are reused; passwords are never stored
+
+## Troubleshooting Permission Issues
+
+<AccordionGroup>
+  <Accordion title="CodexBar can't read Chrome cookies">
+    **Symptom**: "Cookie decryption failed" or "Chrome Safe Storage key not found"
+
+    **Solution**:
+    1. Ensure Chrome is installed and you've signed in at least once
+    2. Open Keychain Access and search for "Chrome Safe Storage"
+    3. Add CodexBar.app to the allowed applications (see [Keychain Access](#keychain-access-prompted-by-macos))
+    4. If the key doesn't exist, open Chrome, visit a website, then check again
+  </Accordion>
+
+  <Accordion title="CodexBar can't read Safari cookies">
+    **Symptom**: "Failed to read Safari cookies" or "Permission denied"
+
+    **Solution**:
+    1. Grant Full Disk Access to CodexBar (see [Full Disk Access](#full-disk-access-optional))
+    2. Restart CodexBar
+    3. If it still fails, check that Safari cookies exist: `~/Library/Safari/LocalStorage/`
+  </Accordion>
+
+  <Accordion title="Constant Keychain prompts for Claude OAuth">
+    **Symptom**: macOS prompts for Keychain access every time CodexBar refreshes
+
+    **Solution**:
+    1. Open Keychain Access.app
+    2. Search for "Claude Code-credentials"
+    3. Double-click → Access Control tab
+    4. Add CodexBar.app to the allowed applications list
+    5. Save and relaunch CodexBar
+  </Accordion>
+
+  <Accordion title="Folder access prompts for external drives">
+    **Symptom**: macOS asks for permission to access "Macintosh HD" or an external volume
+
+    **Solution**:
+    This happens when a CLI (codex, claude, etc.) accesses a file on that volume. 
+
+    **Options**:
+    - Click **OK** to grant access (permission is remembered)
+    - Switch to web or OAuth authentication to avoid CLI invocations
+    - Move the project directory to a location CodexBar already has access to
+  </Accordion>
+</AccordionGroup>
+
+## Revoking Permissions
+
+To completely remove CodexBar's permissions:
+
+1. **Full Disk Access**: System Settings → Privacy & Security → Full Disk Access → Remove CodexBar
+2. **Keychain Access**: Open Keychain Access → For each item → Access Control → Remove CodexBar.app
+3. **Files & Folders**: System Settings → Privacy & Security → Files and Folders → Toggle off CodexBar's permissions
+
+Note that revoking permissions will break functionality that depends on them (e.g., Safari cookie access, OAuth token reads).

@@ -1,0 +1,203 @@
+---
+title: Installation
+description: Install CodexBar on macOS or Linux to monitor your AI provider usage limits
+---
+
+CodexBar is available for macOS 14+ (Sonoma) and Linux (CLI only).
+
+## System Requirements
+
+<Note>
+  CodexBar requires **macOS 14 (Sonoma) or later** for the full menu bar application.
+</Note>
+
+For Linux users, the CLI-only version is available via Homebrew or GitHub Releases.
+
+## Installation Methods
+
+<CodeGroup>
+
+```bash Homebrew (macOS)
+brew install --cask steipete/tap/codexbar
+```
+
+```bash Homebrew (Linux)
+brew install steipete/tap/codexbar
+```
+
+```bash GitHub Releases (macOS)
+# Download the latest release
+open https://github.com/steipete/CodexBar/releases
+
+# Once downloaded, move CodexBar.app to Applications
+mv ~/Downloads/CodexBar.app /Applications/
+```
+
+```bash GitHub Releases (Linux)
+# Download CLI for your architecture
+wget https://github.com/steipete/CodexBar/releases/download/v0.17.0/CodexBarCLI-v0.17.0-linux-x86_64.tar.gz
+
+# Extract the archive
+tar -xzf CodexBarCLI-v0.17.0-linux-x86_64.tar.gz
+
+# Run the CLI
+./codexbar --version
+```
+
+</CodeGroup>
+
+<Info>
+  Linux support is provided via the CLI and includes community integrations for Waybar modules and TUI interfaces.
+</Info>
+
+## Installing the CLI (macOS)
+
+The CodexBar CLI allows you to query usage data from scripts, CI pipelines, or terminal dashboards.
+
+<Steps>
+  <Step title="Install via the App">
+    Open **CodexBar → Preferences → Advanced → Install CLI**
+    
+    This symlinks the CLI helper to `/usr/local/bin/codexbar` and `/opt/homebrew/bin/codexbar`.
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```bash
+    codexbar --version
+    ```
+  </Step>
+  
+  <Step title="Test Usage Query">
+    ```bash
+    codexbar usage --format json --pretty
+    ```
+  </Step>
+</Steps>
+
+### Manual CLI Installation
+
+If you prefer to install the CLI manually:
+
+```bash
+ln -sf "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI" /usr/local/bin/codexbar
+```
+
+## Building from Source
+
+Developers can build CodexBar directly from the repository.
+
+<Steps>
+  <Step title="Clone the Repository">
+    ```bash
+    git clone https://github.com/steipete/CodexBar.git
+    cd CodexBar
+    ```
+  </Step>
+  
+  <Step title="Build the Application">
+    <CodeGroup>
+    
+    ```bash Release Build
+    swift build -c release
+    ./Scripts/package_app.sh
+    ```
+    
+    ```bash Ad-hoc Signing (No Apple Developer Account)
+    CODEXBAR_SIGNING=adhoc ./Scripts/package_app.sh
+    ```
+    
+    ```bash Development Build
+    swift build
+    ./Scripts/package_app.sh
+    ```
+    
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Launch the App">
+    ```bash
+    open CodexBar.app
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  For active development, use the quick dev loop script:
+  
+  ```bash
+  ./Scripts/compile_and_run.sh
+  ```
+  
+  This script builds, tests, packages, and relaunches CodexBar automatically.
+</Tip>
+
+## System Permissions
+
+CodexBar requires certain permissions to access provider data from various sources.
+
+### Full Disk Access (Optional)
+
+<Warning>
+  Only required if you want to read Safari cookies/local storage for web-based providers (Codex web, Claude web, Cursor, Droid/Factory).
+</Warning>
+
+If you don't grant Full Disk Access, you can still use:
+- Chrome/Firefox cookies
+- CLI-only authentication sources
+- OAuth flows
+- API tokens
+
+**To grant Full Disk Access:**
+
+<Steps>
+  <Step title="Open System Settings">
+    Navigate to **System Settings → Privacy & Security → Full Disk Access**
+  </Step>
+  
+  <Step title="Add CodexBar">
+    Click the **+** button and select **CodexBar.app** from Applications
+  </Step>
+  
+  <Step title="Restart CodexBar">
+    Quit and relaunch CodexBar for the permission to take effect
+  </Step>
+</Steps>
+
+### Keychain Access
+
+CodexBar may prompt for keychain access to:
+- Decrypt Chrome/Brave/Edge cookies ("Chrome Safe Storage" key)
+- Read Claude OAuth credentials (stored by Claude CLI)
+- Store API tokens for z.ai, Copilot, and other providers
+
+<Tip>
+  **Prevent repeated keychain prompts:**
+  
+  1. Open **Keychain Access.app**
+  2. Search for the item (e.g., "Chrome Safe Storage" or "Claude Code-credentials")
+  3. Double-click the item → **Access Control** tab
+  4. Add `CodexBar.app` under "Always allow access by these applications"
+  5. Save and relaunch CodexBar
+</Tip>
+
+### Files & Folders Access
+
+<Info>
+  CodexBar may request folder access when launching provider CLIs that read project directories or external drives. This is driven by the CLI's working directory, not background scanning.
+</Info>
+
+CodexBar does **not** request:
+- Screen Recording
+- Accessibility
+- Automation permissions
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Configure providers and start monitoring your usage
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Learn how to use the command-line interface
+  </Card>
+</CardGroup>

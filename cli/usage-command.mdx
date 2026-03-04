@@ -1,0 +1,290 @@
+---
+title: "usage Command"
+description: "Fetch current usage data from providers"
+---
+
+The `usage` command fetches current usage data from configured providers. This is the default command when running `codexbar` without arguments.
+
+## Usage
+
+```bash
+codexbar usage [OPTIONS]
+codexbar [OPTIONS]  # 'usage' is the default command
+```
+
+## Options
+
+### Provider Selection
+
+<ParamField path="--provider" type="string" default="enabled providers in config">
+  Provider identifier to query. Options:
+  - Specific provider ID (e.g., `codex`, `claude`, `cursor`, `gemini`, etc.)
+  - `both` - Query both Codex and Claude
+  - `all` - Query all enabled providers
+  
+  Falls back to defaults when config is missing.
+</ParamField>
+
+### Account Selection
+
+<Note>
+  Account selection flags require a single provider (`--provider claude`, etc.).
+</Note>
+
+<ParamField path="--account" type="string">
+  Select a specific account by label/email (matches the label in config file)
+</ParamField>
+
+<ParamField path="--account-index" type="number">
+  Select account by index (1-based)
+</ParamField>
+
+<ParamField path="--all-accounts" type="flag">
+  Fetch all accounts for the provider
+</ParamField>
+
+### Data Source
+
+<ParamField path="--source" type="string" default="auto">
+  Data source strategy:
+  - `auto` (macOS only) - Uses browser cookies for Codex + Claude, with CLI fallback only when cookies are missing
+  - `web` (macOS only) - Web-only; no CLI fallback
+  - `cli` - CLI-only (Codex RPC → PTY fallback; Claude PTY)
+  - `oauth` - Claude OAuth only (debug); no fallback. Not supported for Codex
+  - `api` - API key flow when the provider supports it (z.ai, Gemini, Copilot, Kilo, Kimi K2, MiniMax, Warp, OpenRouter, Synthetic)
+  
+  <Warning>Linux: `web`/`auto` are not supported; CLI prints an error and exits non-zero</Warning>
+</ParamField>
+
+### Output Format
+
+<ParamField path="--format" type="string" default="text">
+  Output format: `text` or `json`
+</ParamField>
+
+<ParamField path="--pretty" type="flag">
+  Pretty-print JSON output (only applies when `--format json`)
+</ParamField>
+
+### Additional Options
+
+<ParamField path="--no-credits" type="flag">
+  Hide Codex credits in text output
+</ParamField>
+
+<ParamField path="--status" type="flag">
+  Fetch provider status pages and include them in output
+</ParamField>
+
+<ParamField path="--web-timeout" type="number" default="60">
+  Web scraping timeout in seconds (for Codex web source)
+</ParamField>
+
+<ParamField path="--web-debug-dump-html" type="flag">
+  Write HTML snapshots to `/tmp` when data is missing (debug)
+</ParamField>
+
+<ParamField path="--antigravity-plan-debug" type="flag">
+  Print Antigravity planInfo fields to stderr (debug)
+</ParamField>
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Default: text output, respects app toggles
+codexbar
+
+# Force specific provider
+codexbar --provider claude
+codexbar --provider codex
+
+# Query all providers
+codexbar --provider all
+```
+
+### JSON Output
+
+```bash
+# JSON with pretty printing
+codexbar --format json --pretty
+
+# Query both Codex and Claude as JSON
+codexbar --format json --provider both
+
+# JSON only (no stderr output)
+codexbar --json-only --format json --pretty
+```
+
+### Source Selection
+
+```bash
+# Force web source
+codexbar --provider codex --source web --format json --pretty
+
+# Use API source with Gemini
+codexbar --provider gemini --source api --format json --pretty
+
+# Use API with Kilo (requires KILO_API_KEY)
+KILO_API_KEY=... codexbar --provider kilo --source api --format json --pretty
+```
+
+### Account Management
+
+```bash
+# Select specific account
+codexbar --provider claude --account steipete@gmail.com
+
+# Query all accounts
+codexbar --provider claude --all-accounts --format json --pretty
+```
+
+### Status Information
+
+```bash
+# Include status page indicator/description
+codexbar --status
+```
+
+### With API Tokens
+
+```bash
+# Copilot with API token
+COPILOT_API_TOKEN=... codexbar --provider copilot --format json --pretty
+```
+
+## Text Output Example
+
+```
+== Codex 0.6.0 (codex-cli) ==
+Session: 72% left [========----]
+Resets today at 2:15 PM
+Weekly: 41% left [====--------]
+Pace: 6% in reserve | Expected 47% used | Lasts until reset
+Resets Fri at 9:00 AM
+Credits: 112.4 left
+
+== Claude Code 2.0.58 (web) ==
+Session: 88% left [==========--]
+Resets tomorrow at 1:00 AM
+Weekly: 63% left [=======-----]
+Pace: On pace | Expected 37% used | Runs out in 4d
+Resets Sat at 6:00 AM
+Sonnet: 95% left [===========-]
+Account: user@example.com
+Plan: Pro
+
+== Kilo (cli) ==
+Credits: 60% left [=======-----]
+40/100 credits
+Plan: Kilo Pass Pro
+Activity: Auto top-up: visa
+Note: Using CLI fallback
+```
+
+## JSON Output Example
+
+```json
+{
+  "provider": "codex",
+  "version": "0.6.0",
+  "source": "openai-web",
+  "status": {
+    "indicator": "none",
+    "description": "Operational",
+    "updatedAt": "2025-12-04T17:55:00Z",
+    "url": "https://status.openai.com/"
+  },
+  "usage": {
+    "primary": {
+      "usedPercent": 28,
+      "windowMinutes": 300,
+      "resetsAt": "2025-12-04T19:15:00Z"
+    },
+    "secondary": {
+      "usedPercent": 59,
+      "windowMinutes": 10080,
+      "resetsAt": "2025-12-05T17:00:00Z"
+    },
+    "tertiary": null,
+    "updatedAt": "2025-12-04T18:10:22Z",
+    "identity": {
+      "providerID": "codex",
+      "accountEmail": "user@example.com",
+      "accountOrganization": null,
+      "loginMethod": "plus"
+    },
+    "accountEmail": "user@example.com",
+    "accountOrganization": null,
+    "loginMethod": "plus"
+  },
+  "credits": {
+    "remaining": 112.4,
+    "updatedAt": "2025-12-04T18:10:21Z"
+  },
+  "antigravityPlanInfo": null,
+  "openaiDashboard": {
+    "signedInEmail": "user@example.com",
+    "codeReviewRemainingPercent": 100,
+    "creditEvents": [
+      {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "date": "2025-12-04T00:00:00Z",
+        "service": "CLI",
+        "creditsUsed": 123.45
+      }
+    ],
+    "dailyBreakdown": [
+      {
+        "day": "2025-12-04",
+        "services": [
+          {
+            "service": "CLI",
+            "creditsUsed": 123.45
+          }
+        ],
+        "totalCreditsUsed": 123.45
+      }
+    ],
+    "updatedAt": "2025-12-04T18:10:21Z"
+  }
+}
+```
+
+## Token Accounts
+
+The CLI reads multi-account tokens from `~/.codexbar/config.json` (same file as the app).
+
+- Select a specific account: `--account <label>` (matches the label/email in the file)
+- Select by index (1-based): `--account-index <n>`
+- Fetch all accounts for the provider: `--all-accounts`
+
+For Claude, token accounts accept either `sessionKey` cookies or OAuth access tokens (`sk-ant-oat...`). OAuth usage requires the `user:profile` scope; inference-only tokens will return an error.
+
+## Provider-Specific Notes
+
+### Codex (OpenAI)
+
+- Output `source` reflects the strategy actually used (`openai-web`, `web`, `oauth`, `api`, `local`, or provider CLI label)
+- Codex web: OpenAI web dashboard (usage limits, credits remaining, code review remaining, usage breakdown)
+- OpenAI web requires a signed-in `chatgpt.com` session in Safari, Chrome, or Firefox
+- The `openaiDashboard` JSON field is normally sourced from the app's cached dashboard snapshot
+- `--source auto|web` refreshes it live via WebKit using a per-account cookie store
+
+### Claude
+
+- Claude web: claude.ai API (session + weekly usage, plus account metadata when available)
+- Claude CLI status line is custom + user-configurable; never rely on it for usage parsing
+
+### Kilo
+
+- Kilo auto: app.kilo.ai API first, then CLI auth fallback (`~/.local/share/kilo/auth.json`) on missing/unauthorized API credentials
+- Kilo text output splits identity into `Plan:` and `Activity:` lines
+- In `--source auto`, resolved CLI fetches add `Note: Using CLI fallback`
+- Kilo auto-mode failures include a fallback-attempt summary line in text mode (API attempt then CLI attempt)
+
+## Notes
+
+- The `usage` command is the default - running `codexbar` without a command is equivalent to `codexbar usage`
+- Cookie imports default Chrome-only when possible to avoid other browser prompts; override via browser list when needed

@@ -1,0 +1,156 @@
+---
+title: Providers Overview
+description: Track usage and quotas across multiple AI coding assistants from your menu bar
+---
+
+CodexBar supports multiple AI coding assistant providers, each with different authentication methods and usage tracking capabilities. Enable the providers you use from Settings → Providers.
+
+## Supported Providers
+
+CodexBar tracks usage for the following providers:
+
+- **[Codex](/providers/codex)** - OpenAI's coding assistant with CLI, OAuth, and web dashboard support
+- **[Claude](/providers/claude)** - Anthropic's Claude with OAuth API, browser cookies, and CLI fallback
+- **[Cursor](/providers/cursor)** - Browser session cookies for plan and usage tracking
+- **[Gemini](/providers/gemini)** - OAuth-backed quota API using Gemini CLI credentials
+- **[Copilot](/providers/copilot)** - GitHub device flow with Copilot internal usage API
+- **[Other Providers](/providers/other-providers)** - z.ai, Kimi, Kilo, Kimi K2, Kiro, Vertex AI, Augment, Amp, JetBrains AI, OpenRouter, Antigravity, and Droid/Factory
+
+## Authentication Methods
+
+Different providers use different authentication approaches:
+
+<AccordionGroup>
+  <Accordion title="CLI-based Authentication">
+    Providers like Codex and Claude can use local CLI tools:
+    - Automatically uses credentials from installed CLI (`codex`, `claude`, `gemini`)
+    - No additional setup needed if CLI is already authenticated
+    - Preferred method for app-based workflows
+  </Accordion>
+
+  <Accordion title="OAuth Authentication">
+    Providers like Claude and Gemini support OAuth:
+    - Uses OAuth tokens from CLI credentials or device flow
+    - Automatic token refresh when expired
+    - Most reliable for long-term usage tracking
+  </Accordion>
+
+  <Accordion title="Browser Cookies">
+    Many providers support browser cookie import:
+    - Automatically imports from Safari, Chrome, Firefox, Arc, and other browsers
+    - Cached in macOS Keychain to avoid repeated prompts
+    - Manual mode available for pasting cookie headers
+    - Requires Full Disk Access permission on macOS
+  </Accordion>
+
+  <Accordion title="API Token">
+    Some providers use API keys:
+    - Stored in `~/.codexbar/config.json` or environment variables
+    - Configured via Settings → Providers → [Provider]
+    - No browser access required
+  </Accordion>
+
+  <Accordion title="Local Probe">
+    Providers like Antigravity and JetBrains AI read local data:
+    - No external authentication needed
+    - Reads from local language servers or IDE configuration files
+    - Privacy-focused, fully offline
+  </Accordion>
+</AccordionGroup>
+
+## Data Sources
+
+### Fetch Strategies
+
+Each provider can use one or more fetch strategies, typically with automatic fallback:
+
+| Strategy | Description | Examples |
+| --- | --- | --- |
+| **CLI RPC** | JSON-RPC over stdin/stdout | Codex (primary) |
+| **CLI PTY** | Interactive terminal session | Codex, Claude (fallback) |
+| **OAuth API** | OAuth-backed REST API | Claude, Gemini, Vertex AI |
+| **Web API** | Browser cookies + REST API | Claude, Cursor, Droid/Factory |
+| **API Token** | Token-based API | z.ai, Copilot, OpenRouter |
+| **Local Probe** | Local file/server probe | Antigravity, JetBrains AI |
+| **Web Dashboard** | WebView scraping | Codex (optional) |
+
+### Source Labels
+
+CodexBar displays the active source in debug mode:
+
+- `codex-cli` - Codex CLI RPC/PTY
+- `openai-web` - OpenAI web dashboard
+- `oauth` - OAuth API
+- `web` - Web API via cookies
+- `api` - API token
+- `cli` - CLI command
+- `local` - Local probe
+
+## Cookie Management
+
+### Automatic Cookie Import
+
+For providers that support browser cookies:
+
+1. Enable the provider in Settings → Providers
+2. Set Cookie source to "Automatic" (default)
+3. CodexBar imports cookies from your browsers in this order:
+   - Safari: `~/Library/Cookies/Cookies.binarycookies`
+   - Chrome/Chromium: `~/Library/Application Support/Google/Chrome/*/Cookies`
+   - Firefox: `~/Library/Application Support/Firefox/Profiles/*/cookies.sqlite`
+
+### Cookie Caching
+
+Browser cookies are cached in Keychain (`com.steipete.codexbar.cache`) with provider-specific account names like `cookie.codex`, `cookie.claude`, etc. Cached cookies are reused until the session is invalid, reducing Keychain prompts.
+
+### Manual Cookie Entry
+
+If automatic import doesn't work:
+
+1. Open your browser's Developer Tools (F12 or Cmd+Option+I)
+2. Go to the provider's website and log in
+3. Copy the `Cookie:` header from a network request
+4. Paste it in Settings → Providers → [Provider] → Cookie source → Manual
+
+## Status Page Integration
+
+Several providers support status page monitoring:
+
+- **Codex** - [Statuspage.io (OpenAI)](https://status.openai.com)
+- **Claude** - [Statuspage.io (Anthropic)](https://status.anthropic.com)
+- **Cursor** - [Statuspage.io (Cursor)](https://status.cursor.sh)
+- **Copilot** - [Statuspage.io (GitHub)](https://www.githubstatus.com)
+- **Gemini/Antigravity** - Google Workspace incidents (Gemini product)
+- **Droid/Factory** - [status.factory.ai](https://status.factory.ai)
+- **OpenRouter** - [status.openrouter.ai](https://status.openrouter.ai)
+
+When enabled, CodexBar polls status pages and displays incident badges in the menu bar icon and menu.
+
+## Local Cost Usage
+
+CodexBar can scan local log files to compute token costs for:
+
+- **Codex** - `~/.codex/sessions/**/*.jsonl` (last 30 days)
+- **Claude** - `~/.config/claude/projects/**/*.jsonl` or `~/.claude/projects/**/*.jsonl`
+- **Vertex AI** - Claude logs filtered to Vertex AI entries (model name format with `@`)
+
+Cost usage is cached in `~/Library/Caches/CodexBar/cost-usage/` and refreshed with a 60s minimum interval.
+
+## Privacy & Security
+
+- **On-device parsing**: All data parsing happens locally on your Mac
+- **No password storage**: CodexBar never stores passwords
+- **Keychain security**: Tokens and cached cookies are stored in macOS Keychain
+- **Opt-in browser cookies**: Browser cookie import requires Full Disk Access and is opt-in
+- **No telemetry**: CodexBar does not send usage data to external services
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure a Provider" icon="gear" href="/providers/codex">
+    Set up authentication for your preferred provider
+  </Card>
+  <Card title="Author a New Provider" icon="code" href="/providers/authoring">
+    Learn how to add support for a new provider
+  </Card>
+</CardGroup>

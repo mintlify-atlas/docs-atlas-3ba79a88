@@ -1,0 +1,154 @@
+---
+title: "CLI Overview"
+description: "Command-line interface for fetching usage from scripts or terminal"
+---
+
+A lightweight Commander-based CLI that mirrors the menubar app's data paths (Codex web/RPC → PTY fallback; Claude web by default with CLI fallback and OAuth debug). Use it when you need usage numbers in scripts, CI, or dashboards without UI.
+
+## Installation
+
+### macOS
+
+#### App Preferences (Recommended)
+
+In the app: **Preferences → Advanced → Install CLI**. This symlinks `CodexBarCLI` to `/usr/local/bin/codexbar` and `/opt/homebrew/bin/codexbar`.
+
+#### Repository Script
+
+From the repo:
+
+```bash
+./bin/install-codexbar-cli.sh
+```
+
+This creates the same symlink targets as the app preference.
+
+#### Manual Symlink
+
+```bash
+ln -sf "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI" /usr/local/bin/codexbar
+```
+
+### Linux
+
+#### Homebrew (Linuxbrew)
+
+```bash
+brew install steipete/tap/codexbar
+```
+
+#### Direct Download
+
+Download `CodexBarCLI-v<tag>-linux-<arch>.tar.gz` from [GitHub Releases](https://github.com/steipete/CodexBar/releases) (x86_64 + aarch64).
+
+Extract and run:
+
+```bash
+tar -xzf CodexBarCLI-v0.17.0-linux-x86_64.tar.gz
+./codexbar --version
+./codexbar usage --format json --pretty
+```
+
+## Build from Source
+
+### With Package Script
+
+```bash
+./Scripts/package_app.sh
+# or
+./Scripts/compile_and_run.sh
+```
+
+Bundles `CodexBarCLI` into `CodexBar.app/Contents/Helpers/CodexBarCLI`.
+
+### Standalone Build
+
+```bash
+swift build -c release --product CodexBarCLI
+```
+
+Binary at `./.build/release/CodexBarCLI`.
+
+### Requirements
+
+- Swift 6.2+
+- Commander package (`https://github.com/steipete/Commander`)
+
+## Configuration
+
+CodexBar reads `~/.codexbar/config.json` for provider settings, secrets, and ordering.
+
+See [Configuration](/configuration/config-file) for the schema.
+
+## Available Commands
+
+The CLI provides several commands for managing and querying usage data:
+
+<CardGroup cols={2}>
+  <Card title="usage" icon="chart-line" href="/cli/usage-command">
+    Fetch current usage data (default command)
+  </Card>
+  <Card title="cost" icon="dollar-sign" href="/cli/cost-command">
+    Print local token cost usage
+  </Card>
+  <Card title="config validate" icon="check-circle" href="/cli/config-command#validate">
+    Validate config file syntax
+  </Card>
+  <Card title="config dump" icon="file-code" href="/cli/config-command#dump">
+    Print normalized config JSON
+  </Card>
+</CardGroup>
+
+## Global Flags
+
+These flags work with all commands:
+
+<ParamField path="-h, --help" type="flag">
+  Display help information
+</ParamField>
+
+<ParamField path="-V, --version" type="flag">
+  Display version information
+</ParamField>
+
+<ParamField path="-v, --verbose" type="flag">
+  Enable verbose logging
+</ParamField>
+
+<ParamField path="--no-color" type="flag">
+  Disable ANSI colors in text output
+</ParamField>
+
+<ParamField path="--log-level" type="string">
+  Set log level: `trace`, `verbose`, `debug`, `info`, `warning`, `error`, `critical`
+</ParamField>
+
+<ParamField path="--json-output" type="flag">
+  Emit JSONL logs on stderr (machine-readable)
+</ParamField>
+
+<ParamField path="--json-only" type="flag">
+  Suppress non-JSON output; errors become JSON payloads
+</ParamField>
+
+## Exit Codes
+
+The CLI uses specific exit codes to indicate different failure modes:
+
+| Code | Meaning |
+|------|--------|
+| 0 | Success |
+| 1 | Unexpected failure |
+| 2 | Provider missing (binary not on PATH) |
+| 3 | Parse/format error |
+| 4 | CLI timeout |
+
+## Notes
+
+- CLI uses the config file for enabled providers, ordering, and secrets
+- Reset lines follow the in-app reset time display setting when available (default: countdown)
+- Text output uses ANSI colors when stdout is a rich TTY; disable with `--no-color` or `NO_COLOR`/`TERM=dumb`
+- Copilot CLI queries require an API token via config `apiKey` or `COPILOT_API_TOKEN`
+- Prefer Codex RPC first, then PTY fallback; Claude defaults to web with CLI fallback when cookies are missing
+- OpenAI web requires a signed-in `chatgpt.com` session in Safari, Chrome, or Firefox. No passwords are stored; CodexBar reuses cookies
+- Safari cookie import may require granting CodexBar Full Disk Access (System Settings → Privacy & Security → Full Disk Access)

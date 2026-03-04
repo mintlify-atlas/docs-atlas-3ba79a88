@@ -1,0 +1,482 @@
+---
+title: "codexbar usage"
+description: "Fetch AI provider usage and credits from the command line"
+---
+
+## Synopsis
+
+```bash
+codexbar [usage] [OPTIONS]
+codexbar --provider <id> [OPTIONS]
+codexbar --format json [OPTIONS]
+```
+
+The `usage` command (default) fetches current usage data, credits, and account information from AI providers like Codex and Claude. It mirrors the menubar app's data paths and supports multiple data sources including web, CLI, OAuth, and API.
+
+## Parameters
+
+<ParamField path="--provider" type="string" default="enabled providers in config">
+  Provider ID to query. Options:
+  - Specific provider ID (e.g., `codex`, `claude`, `copilot`, `gemini`, `kilo`, `kimi`, `minimax`, `warp`, `openrouter`, `synthetic`, `z.ai`)
+  - `both` - Query default providers (Codex + Claude)
+  - `all` - Query all enabled providers from config
+  
+  Provider IDs are defined in `~/.codexbar/config.json`.
+</ParamField>
+
+<ParamField path="--format" type="string" default="text">
+  Output format. Options:
+  - `text` - Human-readable output with progress bars and ANSI colors
+  - `json` - Machine-readable JSON output
+</ParamField>
+
+<ParamField path="--source" type="string" default="auto">
+  Data source strategy. Options:
+  - `auto` - (macOS only) Uses browser cookies for Codex + Claude, with CLI fallback when cookies are missing
+  - `web` - (macOS only) Web-only; no CLI fallback
+  - `cli` - CLI-only (Codex RPC → PTY fallback; Claude PTY)
+  - `oauth` - Claude OAuth only (debug); not supported for Codex
+  - `api` - API key flow when the provider supports it (z.ai, Gemini, Copilot, Kilo, Kimi K2, MiniMax, Warp, OpenRouter, Synthetic)
+  
+  **Linux**: `web` and `auto` are not supported; CLI exits with error.
+  
+  Output `source` field reflects the actual strategy used: `openai-web`, `web`, `oauth`, `api`, `local`, or provider CLI label.
+</ParamField>
+
+<ParamField path="--account" type="string">
+  Select a specific token account by label or email. Requires a single `--provider`. 
+  
+  Token accounts are configured in `~/.codexbar/config.json`. For Claude, accounts accept either `sessionKey` cookies or OAuth access tokens (`sk-ant-oat...`). OAuth requires the `user:profile` scope.
+</ParamField>
+
+<ParamField path="--account-index" type="integer">
+  Select token account by 1-based index. Requires a single `--provider`.
+</ParamField>
+
+<ParamField path="--all-accounts" type="boolean">
+  Fetch data for all configured accounts for the specified provider. Requires a single `--provider`.
+</ParamField>
+
+<ParamField path="--no-credits" type="boolean">
+  Hide Codex credits in text output.
+</ParamField>
+
+<ParamField path="--pretty" type="boolean">
+  Pretty-print JSON output with indentation.
+</ParamField>
+
+<ParamField path="--status" type="boolean">
+  Fetch provider status pages and include them in output. Queries status.openai.com, status.anthropic.com, etc.
+</ParamField>
+
+<ParamField path="--antigravity-plan-debug" type="boolean">
+  Debug flag: print Antigravity planInfo fields to stderr.
+</ParamField>
+
+<ParamField path="--web-timeout" type="integer" default="60">
+  Timeout in seconds for web data source requests.
+</ParamField>
+
+<ParamField path="--web-debug-dump-html" type="boolean">
+  Write HTML snapshots to `/tmp` when web scraping fails to extract data.
+</ParamField>
+
+<ParamField path="--no-color" type="boolean">
+  Disable ANSI colors in text output. Also honors `NO_COLOR` environment variable or `TERM=dumb`.
+</ParamField>
+
+<ParamField path="--json-output" type="boolean">
+  Emit machine-readable JSONL logs on stderr.
+</ParamField>
+
+<ParamField path="--json-only" type="boolean">
+  Suppress non-JSON output; errors become JSON payloads.
+</ParamField>
+
+<ParamField path="-v, --verbose" type="boolean">
+  Enable verbose logging.
+</ParamField>
+
+<ParamField path="--log-level" type="string">
+  Set log level: `trace`, `verbose`, `debug`, `info`, `warning`, `error`, or `critical`.
+</ParamField>
+
+<ParamField path="-h, --help" type="boolean">
+  Show help message.
+</ParamField>
+
+<ParamField path="-V, --version" type="boolean">
+  Show version information.
+</ParamField>
+
+## Response Fields
+
+### JSON Output Structure
+
+<ResponseField name="provider" type="string" required>
+  Provider ID (e.g., `codex`, `claude`, `copilot`).
+</ResponseField>
+
+<ResponseField name="account" type="string">
+  Account identifier when using multi-account tokens.
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Provider CLI or API version (e.g., `0.6.0`, `2.0.58`).
+</ResponseField>
+
+<ResponseField name="source" type="string" required>
+  Actual data source used: `openai-web`, `web`, `oauth`, `api`, `local`, or provider-specific CLI label (e.g., `codex-cli`).
+</ResponseField>
+
+<ResponseField name="status" type="object">
+  Provider status page information (when `--status` is used).
+  
+  <Expandable title="status fields">
+    <ResponseField name="indicator" type="string">
+      Status indicator: `none` (operational), `minor`, `major`, `critical`, `maintenance`, or `unknown`.
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Status description text.
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp of last status update.
+    </ResponseField>
+    
+    <ResponseField name="url" type="string">
+      Status page URL.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Usage limits and reset times.
+  
+  <Expandable title="usage fields">
+    <ResponseField name="primary" type="object">
+      Primary usage window (e.g., session limit).
+      
+      <ResponseField name="usedPercent" type="integer">
+        Percentage used (0-100).
+      </ResponseField>
+      
+      <ResponseField name="windowMinutes" type="integer">
+        Window duration in minutes (e.g., 300 for 5 hours).
+      </ResponseField>
+      
+      <ResponseField name="resetsAt" type="string">
+        ISO 8601 timestamp when usage resets.
+      </ResponseField>
+    </ResponseField>
+    
+    <ResponseField name="secondary" type="object">
+      Secondary usage window (e.g., weekly limit). Same structure as `primary`.
+    </ResponseField>
+    
+    <ResponseField name="tertiary" type="object">
+      Tertiary usage window (e.g., Sonnet tier). Same structure as `primary`.
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp of when usage was fetched.
+    </ResponseField>
+    
+    <ResponseField name="identity" type="object">
+      Account identity information.
+      
+      <ResponseField name="providerID" type="string">
+        Provider identifier.
+      </ResponseField>
+      
+      <ResponseField name="accountEmail" type="string">
+        Account email address.
+      </ResponseField>
+      
+      <ResponseField name="accountOrganization" type="string">
+        Organization name (if applicable).
+      </ResponseField>
+      
+      <ResponseField name="loginMethod" type="string">
+        Login method (e.g., `plus`, `pro`).
+      </ResponseField>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="credits" type="object">
+  Credits information (Codex, Kilo, etc.).
+  
+  <Expandable title="credits fields">
+    <ResponseField name="remaining" type="number">
+      Credits remaining.
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp of when credits were fetched.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="antigravityPlanInfo" type="object">
+  Antigravity plan information (when available).
+</ResponseField>
+
+<ResponseField name="openaiDashboard" type="object">
+  OpenAI dashboard snapshot with usage breakdown.
+  
+  <Expandable title="openaiDashboard fields">
+    <ResponseField name="signedInEmail" type="string">
+      Signed-in email address.
+    </ResponseField>
+    
+    <ResponseField name="codeReviewRemainingPercent" type="integer">
+      Code review capacity remaining (0-100).
+    </ResponseField>
+    
+    <ResponseField name="creditEvents" type="array">
+      Array of credit usage events.
+      
+      <ResponseField name="id" type="string">
+        Event UUID.
+      </ResponseField>
+      
+      <ResponseField name="date" type="string">
+        ISO 8601 timestamp.
+      </ResponseField>
+      
+      <ResponseField name="service" type="string">
+        Service name (e.g., `CLI`, `Code Review`).
+      </ResponseField>
+      
+      <ResponseField name="creditsUsed" type="number">
+        Credits consumed.
+      </ResponseField>
+    </ResponseField>
+    
+    <ResponseField name="dailyBreakdown" type="array">
+      Daily usage breakdown.
+      
+      <ResponseField name="day" type="string">
+        Date in YYYY-MM-DD format.
+      </ResponseField>
+      
+      <ResponseField name="services" type="array">
+        Array of service usage for the day.
+      </ResponseField>
+      
+      <ResponseField name="totalCreditsUsed" type="number">
+        Total credits used on that day.
+      </ResponseField>
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp of dashboard snapshot.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error information when provider query fails.
+  
+  <Expandable title="error fields">
+    <ResponseField name="message" type="string">
+      Error message.
+    </ResponseField>
+    
+    <ResponseField name="code" type="string">
+      Error code.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Default usage (text format)
+
+```bash
+codexbar
+```
+
+**Output:**
+```
+== Codex 0.6.0 (codex-cli) ==
+Session: 72% left [========----]
+Resets today at 2:15 PM
+Weekly: 41% left [====--------]
+Pace: 6% in reserve | Expected 47% used | Lasts until reset
+Resets Fri at 9:00 AM
+Credits: 112.4 left
+
+== Claude Code 2.0.58 (web) ==
+Session: 88% left [==========--]
+Resets tomorrow at 1:00 AM
+Weekly: 63% left [=======-----]
+Pace: On pace | Expected 37% used | Runs out in 4d
+Resets Sat at 6:00 AM
+Sonnet: 95% left [===========-]
+Account: user@example.com
+Plan: Pro
+```
+
+### Query specific provider with JSON output
+
+```bash
+codexbar --provider claude --format json --pretty
+```
+
+**Output:**
+```json
+{
+  "provider": "codex",
+  "version": "0.6.0",
+  "source": "openai-web",
+  "status": {
+    "indicator": "none",
+    "description": "Operational",
+    "updatedAt": "2025-12-04T17:55:00Z",
+    "url": "https://status.openai.com/"
+  },
+  "usage": {
+    "primary": {
+      "usedPercent": 28,
+      "windowMinutes": 300,
+      "resetsAt": "2025-12-04T19:15:00Z"
+    },
+    "secondary": {
+      "usedPercent": 59,
+      "windowMinutes": 10080,
+      "resetsAt": "2025-12-05T17:00:00Z"
+    },
+    "tertiary": null,
+    "updatedAt": "2025-12-04T18:10:22Z",
+    "identity": {
+      "providerID": "codex",
+      "accountEmail": "user@example.com",
+      "accountOrganization": null,
+      "loginMethod": "plus"
+    }
+  },
+  "credits": {
+    "remaining": 112.4,
+    "updatedAt": "2025-12-04T18:10:21Z"
+  },
+  "openaiDashboard": {
+    "signedInEmail": "user@example.com",
+    "codeReviewRemainingPercent": 100,
+    "creditEvents": [
+      {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "date": "2025-12-04T00:00:00Z",
+        "service": "CLI",
+        "creditsUsed": 123.45
+      }
+    ],
+    "dailyBreakdown": [
+      {
+        "day": "2025-12-04",
+        "services": [
+          {
+            "service": "CLI",
+            "creditsUsed": 123.45
+          }
+        ],
+        "totalCreditsUsed": 123.45
+      }
+    ],
+    "updatedAt": "2025-12-04T18:10:21Z"
+  }
+}
+```
+
+### Query all providers
+
+```bash
+codexbar --provider all --format json --pretty
+```
+
+### Query with status page data
+
+```bash
+codexbar --status
+```
+
+### Query specific account
+
+```bash
+codexbar --provider claude --account steipete@gmail.com
+codexbar --provider claude --account-index 2
+```
+
+### Query all accounts for a provider
+
+```bash
+codexbar --provider claude --all-accounts --format json --pretty
+```
+
+### Use API key source
+
+```bash
+COPILOT_API_TOKEN=ghp_xxx codexbar --provider copilot --format json --pretty
+KILO_API_KEY=sk_xxx codexbar --provider kilo --source api --format json --pretty
+codexbar --provider gemini --source api --format json --pretty
+```
+
+### Machine-readable output only
+
+```bash
+codexbar --json-only --format json --pretty
+```
+
+### Use web source explicitly
+
+```bash
+codexbar --provider codex --source web --format json --pretty
+```
+
+## Exit Codes
+
+- **0**: Success
+- **1**: Unexpected failure
+- **2**: Provider binary not found (not on PATH)
+- **3**: Parse/format error
+- **4**: CLI timeout
+
+## Notes
+
+### Configuration
+
+- CLI reads `~/.codexbar/config.json` for provider settings, secrets, and ordering
+- Enabled providers and their order are respected from config
+- Reset times follow the in-app reset time display setting (default: countdown)
+
+### Web Data Sources
+
+- **Codex web**: OpenAI web dashboard (usage limits, credits, code review, usage breakdown)
+  - Requires signed-in session in Safari, Chrome, or Firefox at `chatgpt.com`
+  - No passwords stored; CodexBar reuses browser cookies
+  - Safari may require Full Disk Access (System Settings → Privacy & Security → Full Disk Access)
+  - `openaiDashboard` JSON field is normally cached; `--source auto|web` refreshes live via WebKit
+  
+- **Claude web**: claude.ai API (session + weekly usage, plus account metadata)
+  - Uses browser cookies or OAuth tokens from config
+
+### Text Output
+
+- Uses ANSI colors when stdout is a rich TTY
+- Disable colors with `--no-color`, `NO_COLOR` environment variable, or `TERM=dumb`
+- Progress bars show usage percentage visually
+- Reset lines show countdown or absolute time based on app preferences
+
+### API Keys
+
+- **Copilot**: Requires `apiKey` in config or `COPILOT_API_TOKEN` environment variable
+- **Kilo**: Supports `KILO_API_KEY` environment variable
+- **Gemini, z.ai, etc.**: Configure API keys in `~/.codexbar/config.json`
+
+### Data Source Priority
+
+- **Codex**: Prefers RPC, falls back to PTY
+- **Claude**: Defaults to web with CLI fallback when cookies are missing
+- **Kilo auto**: app.kilo.ai API first, then CLI auth fallback (`~/.local/share/kilo/auth.json`)

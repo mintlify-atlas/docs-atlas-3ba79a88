@@ -1,0 +1,222 @@
+---
+title: "config Command"
+description: "Validate and inspect configuration files"
+---
+
+The `config` command provides utilities for validating and inspecting the CodexBar configuration file (`~/.codexbar/config.json`).
+
+## Subcommands
+
+<CardGroup cols={2}>
+  <Card title="validate" icon="check-circle">
+    Check config file for invalid fields
+  </Card>
+  <Card title="dump" icon="file-code">
+    Print normalized config JSON
+  </Card>
+</CardGroup>
+
+## validate
+
+Validates the configuration file and reports any warnings or errors.
+
+### Usage
+
+```bash
+codexbar config validate [OPTIONS]
+codexbar config  # 'validate' is the default subcommand
+```
+
+### Options
+
+<ParamField path="--format" type="string" default="text">
+  Output format: `text` or `json`
+</ParamField>
+
+<ParamField path="--pretty" type="flag">
+  Pretty-print JSON output (only applies when `--format json`)
+</ParamField>
+
+<ParamField path="--json-only" type="flag">
+  Suppress non-JSON output; errors become JSON payloads
+</ParamField>
+
+### Exit Codes
+
+- **0**: Config is valid (warnings are allowed and don't change exit code)
+- **Non-zero**: Config has errors
+
+### Examples
+
+#### Text Output
+
+```bash
+# Validate config with text output
+codexbar config validate
+```
+
+**Success:**
+```
+Config: OK
+```
+
+**With Issues:**
+```
+[WARNING] claude (source): 'oauth' source is experimental
+[ERROR] codex (apiKey): API key is invalid format
+[WARNING] gemini: Region not specified, using default
+```
+
+#### JSON Output
+
+```bash
+# Validate with JSON output
+codexbar config validate --format json --pretty
+```
+
+**Success (empty array):**
+```json
+[]
+```
+
+**With Issues:**
+```json
+[
+  {
+    "severity": "warning",
+    "provider": "claude",
+    "field": "source",
+    "message": "'oauth' source is experimental"
+  },
+  {
+    "severity": "error",
+    "provider": "codex",
+    "field": "apiKey",
+    "message": "API key is invalid format"
+  },
+  {
+    "severity": "warning",
+    "provider": "gemini",
+    "field": null,
+    "message": "Region not specified, using default"
+  }
+]
+```
+
+### JSON Output Fields
+
+<ParamField path="severity" type="string">
+  Issue severity: `"warning"` or `"error"`
+</ParamField>
+
+<ParamField path="provider" type="string | null">
+  Provider ID the issue relates to, or `null` for global config issues
+</ParamField>
+
+<ParamField path="field" type="string | null">
+  Specific config field with the issue, or `null` for general issues
+</ParamField>
+
+<ParamField path="message" type="string">
+  Human-readable description of the issue
+</ParamField>
+
+## dump
+
+Prints the normalized configuration as JSON. This shows how CodexBar interprets your config file after applying defaults.
+
+### Usage
+
+```bash
+codexbar config dump [OPTIONS]
+```
+
+### Options
+
+<ParamField path="--pretty" type="flag">
+  Pretty-print JSON output
+</ParamField>
+
+### Examples
+
+```bash
+# Dump config (compact)
+codexbar config dump
+
+# Dump config (pretty-printed)
+codexbar config dump --pretty
+```
+
+### Output Example
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "codex",
+      "enabled": true,
+      "source": "auto",
+      "cookieSource": "auto",
+      "cookieHeader": null,
+      "apiKey": null,
+      "region": null,
+      "workspaceID": null,
+      "tokenAccounts": null
+    },
+    {
+      "id": "claude",
+      "enabled": true,
+      "source": "auto",
+      "cookieSource": "auto",
+      "cookieHeader": null,
+      "apiKey": null,
+      "region": null,
+      "workspaceID": null,
+      "tokenAccounts": {
+        "version": 1,
+        "activeIndex": 0,
+        "accounts": [
+          {
+            "id": "00000000-0000-0000-0000-000000000000",
+            "label": "user@example.com",
+            "token": "sk-ant-...",
+            "addedAt": 1735123456,
+            "lastUsed": 1735220000
+          }
+        ]
+      }
+    },
+    {
+      "id": "cursor",
+      "enabled": false,
+      "source": "auto",
+      "cookieSource": "auto",
+      "cookieHeader": null,
+      "apiKey": null,
+      "region": null,
+      "workspaceID": null,
+      "tokenAccounts": null
+    }
+  ]
+}
+```
+
+## Configuration File Location
+
+- **Path**: `~/.codexbar/config.json`
+- **Permissions**: Forced to `0600` on macOS and Linux (readable/writable by owner only)
+- **Format**: JSON
+
+See [Configuration](/configuration/config-file) for full documentation on the config file format.
+
+## Notes
+
+- The directory `~/.codexbar/` is created automatically if missing
+- Secrets (API keys, cookies, tokens) are stored in the config file; Keychain is not used
+- Keep the config file private as it contains sensitive credentials
+- Omitted providers in the config are appended with defaults during normalization
+- The order of providers in the config controls display order in the app and CLI
+- Fields not relevant to a provider are ignored
+- Use `validate` before committing config changes to catch errors early
+- Use `dump` to see the full normalized config including all defaults

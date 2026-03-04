@@ -1,0 +1,69 @@
+---
+title: "Menu Bar Interface"
+description: "Two-bar meter visualization showing session and weekly usage limits in your macOS menu bar"
+---
+
+## Overview
+
+CodexBar lives in your macOS menu bar as a minimal status item that displays your AI usage at a glance. The interface uses a compact two-bar meter design that makes it easy to monitor your limits without taking up valuable menu bar space.
+
+## Two-Bar Meter Visualization
+
+The menu bar icon is a tiny 18×18 pixel two-bar meter that represents your usage:
+
+<CardGroup cols={2}>
+  <Card title="Top Bar" icon="gauge-high">
+    **5-hour/session window**  
+    Shows your current session usage. If weekly limits are exhausted but credits remain available, this becomes a thicker credits bar.
+  </Card>
+  <Card title="Bottom Bar" icon="gauge-simple">
+    **Weekly window (hairline)**  
+    Displays your weekly usage as a thin line beneath the session bar.
+  </Card>
+</CardGroup>
+
+### Visual Indicators
+
+- **Fill representation**: By default, bars show percent remaining. Enable "Show usage as used" in settings to flip to percent consumed.
+- **Dimmed icon**: Appears when the last refresh failed or data is stale
+- **Status overlays**: Incident indicators appear on the icon when provider status issues are detected
+
+## Menu Card Details
+
+Click the menu bar icon to view detailed usage information:
+
+- **Session + weekly rows**: Current usage with reset countdowns (or absolute clock times if configured)
+- **Pace tracking**: Compares your actual usage against an even-consumption budget
+  - **On pace**: Usage matches expected rate
+  - **X% in deficit**: Consuming faster than average (shows "Runs out in..." countdown)
+  - **X% in reserve**: Consuming slower than average (shows "Lasts until reset")
+- **Provider-specific data**: Credits, code review remaining, usage breakdowns, and more
+
+<Note>
+Pace tracking is calculated for Codex and Claude weekly windows only, and is hidden when less than 3% of the window has elapsed.
+</Note>
+
+## Advanced Display Options
+
+CodexBar offers alternative menu bar visualizations:
+
+- **Provider branding icons**: Display provider logos with a percentage label instead of meter bars
+- **Merge Icons mode**: Combine multiple providers into a single status item (see [Merge Icons](/features/merge-icons))
+
+## Status Item Behavior
+
+- **No Dock icon**: CodexBar runs as an LSUIElement app, appearing only in the menu bar
+- **Per-provider toggles**: Enable or disable individual providers from Settings → Providers
+- **Refresh cadence**: Choose from manual, 1m, 2m, 5m, or 15m refresh intervals
+- **WidgetKit integration**: Home screen widgets mirror the menu card snapshot
+
+## Related Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Provider Support" icon="grid" href="/features/multi-provider">
+    Track 15+ AI providers simultaneously
+  </Card>
+  <Card title="Merge Icons Mode" icon="layer-group" href="/features/merge-icons">
+    Consolidate providers into one menu item
+  </Card>
+</CardGroup>

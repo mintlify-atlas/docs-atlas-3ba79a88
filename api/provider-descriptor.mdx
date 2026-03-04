@@ -1,0 +1,241 @@
+---
+title: ProviderDescriptor
+description: Core provider definition that encapsulates metadata, branding, fetch strategies, and CLI configuration
+---
+
+The `ProviderDescriptor` struct is the single source of truth for each provider in CodexBar. It defines how to fetch usage data, display the provider in the UI, and configure CLI behavior.
+
+## Overview
+
+Every provider in CodexBar is defined by a descriptor that declares:
+- **Identity**: Unique provider ID
+- **Metadata**: Display labels, URLs, capabilities
+- **Branding**: Icon style, resource name, and color
+- **Token cost**: Whether token-level usage tracking is supported
+- **Fetch plan**: Available source modes and fetch strategies
+- **CLI config**: Command name, aliases, and version detection
+
+## Structure Definition
+
+<ParamField path="id" type="UsageProvider" required>
+  The unique identifier for this provider (e.g., `.codex`, `.claude`, `.cursor`)
+</ParamField>
+
+<ParamField path="metadata" type="ProviderMetadata" required>
+  Display labels, capabilities, and URLs for this provider
+  
+  <Expandable title="ProviderMetadata fields">
+    <ResponseField name="displayName" type="String">
+      Human-readable name shown in UI (e.g., "Codex", "Claude")
+    </ResponseField>
+    
+    <ResponseField name="sessionLabel" type="String">
+      Label for session/short-term rate limit window
+    </ResponseField>
+    
+    <ResponseField name="weeklyLabel" type="String">
+      Label for weekly/long-term rate limit window
+    </ResponseField>
+    
+    <ResponseField name="supportsCredits" type="Bool">
+      Whether this provider has credit tracking
+    </ResponseField>
+    
+    <ResponseField name="creditsHint" type="String">
+      Hint text shown when credits are available
+    </ResponseField>
+    
+    <ResponseField name="toggleTitle" type="String">
+      Title for enable/disable toggle in settings
+    </ResponseField>
+    
+    <ResponseField name="defaultEnabled" type="Bool">
+      Whether provider is enabled by default
+    </ResponseField>
+    
+    <ResponseField name="dashboardURL" type="String?">
+      URL to provider's usage dashboard (optional)
+    </ResponseField>
+    
+    <ResponseField name="statusPageURL" type="String?">
+      Statuspage.io URL for incident polling (optional)
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="branding" type="ProviderBranding" required>
+  Visual identity for the provider
+  
+  <Expandable title="ProviderBranding fields">
+    <ResponseField name="iconStyle" type="IconStyle">
+      Icon rendering style (e.g., `.codex`, `.claude`)
+    </ResponseField>
+    
+    <ResponseField name="iconResourceName" type="String">
+      Asset name for provider icon (must match asset catalog)
+    </ResponseField>
+    
+    <ResponseField name="color" type="ProviderColor">
+      RGB color used in menu cards and switcher
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="tokenCost" type="ProviderTokenCostConfig" required>
+  Configuration for token-level cost tracking
+  
+  <Expandable title="ProviderTokenCostConfig fields">
+    <ResponseField name="supportsTokenCost" type="Bool">
+      Whether this provider tracks token-level costs
+    </ResponseField>
+    
+    <ResponseField name="noDataMessage" type="@Sendable () -> String">
+      Closure returning message shown when cost data is unavailable
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="fetchPlan" type="ProviderFetchPlan" required>
+  Defines available source modes and fetch strategy pipeline
+</ParamField>
+
+<ParamField path="cli" type="ProviderCLIConfig" required>
+  CLI-specific configuration
+  
+  <Expandable title="ProviderCLIConfig fields">
+    <ResponseField name="name" type="String">
+      Primary CLI command name
+    </ResponseField>
+    
+    <ResponseField name="aliases" type="[String]">
+      Alternative names accepted by CLI
+    </ResponseField>
+    
+    <ResponseField name="versionDetector" type="(() -> String?)?">
+      Optional closure to detect installed version
+    </ResponseField>
+  </Expandable>
+</ParamField>
+
+## Methods
+
+### fetchOutcome
+
+```swift
+public func fetchOutcome(context: ProviderFetchContext) async -> ProviderFetchOutcome
+```
+
+Executes the provider's fetch plan and returns detailed outcome including all attempts.
+
+**Parameters:**
+- `context`: Fetch context containing runtime mode, settings, and dependencies
+
+**Returns:** `ProviderFetchOutcome` with result and attempt history
+
+### fetch
+
+```swift
+public func fetch(context: ProviderFetchContext) async throws -> ProviderFetchResult
+```
+
+Convenience method that executes fetch and unwraps the result.
+
+**Parameters:**
+- `context`: Fetch context containing runtime mode, settings, and dependencies
+
+**Returns:** `ProviderFetchResult` on success
+
+**Throws:** Error if all strategies fail
+
+## Example: Defining a Provider
+
+```swift
+import CodexBarMacroSupport
+import Foundation
+
+@ProviderDescriptorRegistration
+@ProviderDescriptorDefinition
+public enum ClaudeProviderDescriptor {
+    static func makeDescriptor() -> ProviderDescriptor {
+        ProviderDescriptor(
+            id: .claude,
+            metadata: ProviderMetadata(
+                id: .claude,
+                displayName: "Claude",
+                sessionLabel: "5-hour",
+                weeklyLabel: "Weekly",
+                opusLabel: nil,
+                supportsOpus: false,
+                supportsCredits: true,
+                creditsHint: "Credits remaining",
+                toggleTitle: "Show Claude usage",
+                cliName: "claude",
+                defaultEnabled: true,
+                isPrimaryProvider: false,
+                usesAccountFallback: false,
+                dashboardURL: "https://console.anthropic.com",
+                statusPageURL: "https://status.anthropic.com"),
+            branding: ProviderBranding(
+                iconStyle: .claude,
+                iconResourceName: "ProviderIcon-claude",
+                color: ProviderColor(red: 0.82, green: 0.61, blue: 0.47)),
+            tokenCost: ProviderTokenCostConfig(
+                supportsTokenCost: true,
+                noDataMessage: { "Claude cost summary not available." }),
+            fetchPlan: ProviderFetchPlan(
+                sourceModes: [.auto, .web, .cli],
+                pipeline: ProviderFetchPipeline(
+                    resolveStrategies: { context in
+                        [
+                            ClaudeCLIStrategy(),
+                            ClaudeWebStrategy()
+                        ]
+                    }
+                )
+            ),
+            cli: ProviderCLIConfig(
+                name: "claude",
+                versionDetector: { /* ... */ })
+        )
+    }
+}
+```
+
+## Registry Access
+
+Providers are automatically registered via macros and can be accessed through the registry:
+
+```swift
+// Get all registered providers
+let allProviders = ProviderDescriptorRegistry.all
+
+// Get specific provider descriptor
+let claudeDescriptor = ProviderDescriptorRegistry.descriptor(for: .claude)
+
+// Get all provider metadata
+let metadata = ProviderDescriptorRegistry.metadata
+
+// Get CLI name mapping
+let cliNameMap = ProviderDescriptorRegistry.cliNameMap
+```
+
+## Best Practices
+
+<Warning>
+**Identity silo rule**: Never display identity/plan fields from provider A inside provider B UI. Each provider must maintain its own identity scope.
+</Warning>
+
+<Tip>
+Use the `@ProviderDescriptorRegistration` macro to automatically register your provider descriptor without manual registry updates.
+</Tip>
+
+- Keep descriptor definitions small and focused
+- Use existing strategies when possible instead of creating duplicates
+- Provide meaningful `noDataMessage` closures for token cost
+- Set `defaultEnabled: false` for new providers until thoroughly tested
+- Always provide a `statusPageURL` or `statusLinkURL` when available
+
+## Related
+
+- [Fetch Strategies](/api/provider-fetch) - Learn about fetch pipelines and strategies
+- [Usage Models](/api/usage-models) - Understand usage snapshot data structures

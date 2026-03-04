@@ -1,0 +1,477 @@
+---
+title: Config File Reference
+description: Complete schema and examples for ~/.codexbar/config.json and provider configuration options.
+---
+
+## Overview
+
+CodexBar stores all provider configurations in a single JSON file at `~/.codexbar/config.json`. This file contains:
+
+- Provider enable/disable toggles
+- Authentication credentials (API keys, cookies)
+- Source mode preferences (CLI, web, OAuth, API)
+- Provider-specific settings (region, workspace ID)
+
+<Warning>
+**Security**: The config file contains sensitive credentials. CodexBar sets file permissions to `0600` (owner read/write only) automatically.
+</Warning>
+
+## File Location
+
+- **Path**: `~/.codexbar/config.json`
+- **Permissions**: `0600` (enforced on macOS and Linux)
+- **Auto-created**: If missing, CodexBar creates it with default settings
+
+## Schema
+
+### Root Structure
+
+```json
+{
+  "version": 1,
+  "providers": [
+    // Array of ProviderConfig objects
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | `number` | Yes | Config schema version (currently `1`) |
+| `providers` | `array` | Yes | List of provider configurations |
+
+### Provider Configuration
+
+```json
+{
+  "id": "codex",
+  "enabled": true,
+  "source": "auto",
+  "cookieSource": "auto",
+  "cookieHeader": null,
+  "apiKey": null,
+  "region": null,
+  "workspaceID": null,
+  "tokenAccounts": null
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Provider identifier (see [Provider IDs](#provider-ids)) |
+| `enabled` | `boolean` | No | Enable/disable provider (defaults to provider default) |
+| `source` | `string` | No | Preferred source mode: `auto`, `web`, `cli`, `oauth`, `api` |
+| `cookieSource` | `string` | No | Cookie policy: `auto` (browser import), `manual`, `off` |
+| `cookieHeader` | `string` | No | Raw cookie header for manual cookie mode |
+| `apiKey` | `string` | No | API token for providers with API support |
+| `region` | `string` | No | Provider-specific region (e.g., `zai`, `minimax`) |
+| `workspaceID` | `string` | No | Workspace identifier (e.g., `opencode`) |
+| `tokenAccounts` | `object` | No | Multi-account token data (see [Token Accounts](#token-accounts)) |
+
+## Provider IDs
+
+Valid provider identifiers:
+
+```
+codex, claude, cursor, opencode, factory, gemini, antigravity, 
+copilot, zai, minimax, kimi, kilo, kiro, vertexai, augment, 
+jetbrains, kimik2, amp, ollama, synthetic, warp, openrouter
+```
+
+<Note>
+Provider order in the `providers` array controls display order in the app and CLI. Reorder the array to change menu bar icon sequence.
+</Note>
+
+## Source Modes
+
+| Mode | Description | Availability |
+|------|-------------|-------------|
+| `auto` | Uses provider-specific fallback order | All providers |
+| `web` | Force browser cookie authentication | Web-capable providers |
+| `cli` | Force CLI tool invocation | CLI-capable providers |
+| `oauth` | Force OAuth flow | Claude, Gemini, Copilot |
+| `api` | Force API key authentication | Providers with API support |
+
+Each provider has a default fallback order when `auto` is selected. See individual provider docs for details.
+
+## Cookie Sources
+
+| Source | Description | Use Case |
+|--------|-------------|----------|
+| `auto` | Import cookies from browsers automatically | Default for most users |
+| `manual` | Use `cookieHeader` field | Browser import fails or unsupported browser |
+| `off` | Disable cookie-based authentication | Use CLI or OAuth instead |
+
+### Manual Cookie Header Format
+
+When using `cookieSource: "manual"`, provide the raw cookie header:
+
+```json
+{
+  "id": "claude",
+  "cookieSource": "manual",
+  "cookieHeader": "sessionKey=abc123...; __cf_bm=xyz789...; intercom-session=..."
+}
+```
+
+<Warning>
+Cookie headers contain sensitive session tokens. Never commit `config.json` to version control or share it publicly.
+</Warning>
+
+## Token Accounts
+
+Some providers support multiple accounts with separate tokens (e.g., OpenRouter, Synthetic).
+
+### Schema
+
+```json
+{
+  "version": 1,
+  "activeIndex": 0,
+  "accounts": [
+    {
+      "id": "00000000-0000-0000-0000-000000000000",
+      "label": "user@example.com",
+      "token": "sk-or-v1-...",
+      "addedAt": 1735123456,
+      "lastUsed": 1735220000
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | `number` | Yes | Token accounts schema version (currently `1`) |
+| `activeIndex` | `number` | Yes | Index of the active account in the `accounts` array |
+| `accounts` | `array` | Yes | List of account objects |
+
+### Account Object
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | Yes | Unique UUID for the account |
+| `label` | `string` | Yes | Display name (typically email) |
+| `token` | `string` | Yes | API token or bearer token |
+| `addedAt` | `number` | Yes | Unix timestamp when account was added |
+| `lastUsed` | `number` | No | Unix timestamp of last use |
+
+## Examples
+
+### Minimal Configuration
+
+Default providers with no customization:
+
+```json
+{
+  "version": 1,
+  "providers": [
+    { "id": "codex" },
+    { "id": "claude" },
+    { "id": "cursor" },
+    { "id": "opencode" },
+    { "id": "gemini" }
+  ]
+}
+```
+
+### Codex with Manual Cookie
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "codex",
+      "enabled": true,
+      "source": "auto",
+      "cookieSource": "manual",
+      "cookieHeader": "__Secure-next-auth.session-token=eyJhbGc...; __cf_bm=abc..."
+    }
+  ]
+}
+```
+
+### Claude with OAuth and CLI Fallback
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "claude",
+      "enabled": true,
+      "source": "oauth"
+    }
+  ]
+}
+```
+
+<Note>
+OAuth credentials are stored in Keychain, not in `config.json`. The `source` field only controls the preferred authentication method.
+</Note>
+
+### z.ai with API Token and Region
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "zai",
+      "enabled": true,
+      "apiKey": "zai_1234567890abcdef",
+      "region": "us-west"
+    }
+  ]
+}
+```
+
+### OpenCode with Workspace ID
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "opencode",
+      "enabled": true,
+      "workspaceID": "my-workspace-id"
+    }
+  ]
+}
+```
+
+### Multiple Providers with Custom Order
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "claude",
+      "enabled": true,
+      "source": "oauth"
+    },
+    {
+      "id": "codex",
+      "enabled": true,
+      "source": "cli",
+      "cookieSource": "off"
+    },
+    {
+      "id": "cursor",
+      "enabled": true,
+      "cookieSource": "auto"
+    },
+    {
+      "id": "gemini",
+      "enabled": false
+    }
+  ]
+}
+```
+
+### OpenRouter with Multi-Account Tokens
+
+```json
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "openrouter",
+      "enabled": true,
+      "tokenAccounts": {
+        "version": 1,
+        "activeIndex": 0,
+        "accounts": [
+          {
+            "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "label": "work@example.com",
+            "token": "sk-or-v1-abc123...",
+            "addedAt": 1735123456,
+            "lastUsed": 1735220000
+          },
+          {
+            "id": "f7e8d9c0-b1a2-3456-7890-abcdef123456",
+            "label": "personal@example.com",
+            "token": "sk-or-v1-xyz789...",
+            "addedAt": 1735130000,
+            "lastUsed": null
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+## Editing the Config File
+
+### Via Settings UI
+
+Most settings can be changed through Settings → Providers:
+- Enable/disable toggles
+- Source mode selection
+- Cookie source selection
+- API key entry
+- Region and workspace ID fields
+
+Changes are automatically saved to `config.json`.
+
+### Manual Editing
+
+1. Quit CodexBar
+2. Open `~/.codexbar/config.json` in a text editor
+3. Make changes (see examples above)
+4. Validate JSON syntax
+5. Relaunch CodexBar
+
+<Warning>
+Manual edits bypass validation. Invalid JSON or unsupported values may cause CodexBar to fail to launch.
+</Warning>
+
+## Validating the Config
+
+Use the CLI to validate your config:
+
+```bash
+codexbar config validate
+```
+
+For JSON output:
+
+```bash
+codexbar config validate --format json
+```
+
+Example output:
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    "Provider 'gemini' is disabled but has API key configured"
+  ]
+}
+```
+
+## Config Normalization
+
+CodexBar normalizes the config on load:
+
+1. **Adds missing providers**: Any provider not in the `providers` array is appended with defaults
+2. **Removes duplicates**: If a provider appears multiple times, only the first occurrence is kept
+3. **Applies defaults**: Omitted fields use provider-specific defaults
+4. **Cleans sensitive fields**: Trims whitespace and removes surrounding quotes from `apiKey` and `cookieHeader`
+
+## Migration from Legacy Storage
+
+CodexBar previously stored credentials in Keychain and UserDefaults. Starting with v2.0, all credentials are migrated to `config.json`.
+
+**What gets migrated:**
+- Keychain-stored API tokens (z.ai, Copilot, OpenRouter, Synthetic, etc.)
+- Keychain-stored cookie headers (Codex, Claude, Cursor, Factory, etc.)
+- UserDefaults provider toggles and source modes
+
+**What stays in Keychain:**
+- OAuth tokens (Claude OAuth, Gemini OAuth)
+- Browser safe storage keys (for automatic cookie decryption)
+
+Migration happens automatically on first launch. Legacy storage is not deleted to allow rollback.
+
+## Backup and Restore
+
+### Backing Up
+
+```bash
+cp ~/.codexbar/config.json ~/.codexbar/config.json.backup
+```
+
+### Restoring
+
+```bash
+cp ~/.codexbar/config.json.backup ~/.codexbar/config.json
+```
+
+Relaunch CodexBar after restoring.
+
+## Resetting to Defaults
+
+```bash
+rm ~/.codexbar/config.json
+```
+
+CodexBar recreates the file with default settings on next launch.
+
+<Warning>
+This deletes all provider configurations, API keys, and custom settings. Use "Export Settings" from the UI if you want to preserve a copy.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Config file is missing or empty">
+    **Symptom**: CodexBar shows no providers or "Failed to load config"
+
+    **Solution**:
+    1. Check that `~/.codexbar/` directory exists
+    2. Check file permissions: `ls -la ~/.codexbar/config.json`
+    3. Recreate with: `codexbar config validate` (generates default config if missing)
+  </Accordion>
+
+  <Accordion title="Changes don't persist after editing">
+    **Symptom**: Manual edits to `config.json` are lost after relaunching CodexBar
+
+    **Solution**:
+    1. Ensure CodexBar is fully quit (check Activity Monitor)
+    2. Verify JSON syntax with: `python3 -m json.tool ~/.codexbar/config.json`
+    3. Check that file isn't read-only: `ls -la ~/.codexbar/config.json`
+    4. If permissions are wrong: `chmod 600 ~/.codexbar/config.json`
+  </Accordion>
+
+  <Accordion title="API key or cookie not working">
+    **Symptom**: Provider shows "Authentication failed" despite correct credentials
+
+    **Causes**:
+    1. **Extra whitespace**: Credentials are trimmed, but extra newlines or tabs may remain
+    2. **Quoted values**: Remove surrounding quotes: `"apiKey": "sk-abc"` not `"apiKey": "\"sk-abc\""`
+    3. **Expired tokens**: Cookie headers and API keys expire; refresh them
+    4. **Wrong format**: Ensure `cookieHeader` is a semicolon-separated string, not JSON
+
+    **Solution**: Use Settings UI to re-enter credentials (it handles sanitization automatically).
+  </Accordion>
+
+  <Accordion title="Provider order doesn't match config">
+    **Symptom**: Menu bar icons appear in wrong order despite correct `providers` array order
+
+    **Solution**:
+    1. Verify the order in `config.json`
+    2. Restart CodexBar (Quit → Relaunch, not just closing the menu)
+    3. Check Settings → Providers for the order
+    4. If still wrong, delete `config.json` and reconfigure
+  </Accordion>
+</AccordionGroup>
+
+## CLI Configuration Commands
+
+### View Current Config
+
+```bash
+codexbar config show
+```
+
+### Validate Config
+
+```bash
+codexbar config validate
+```
+
+### Reset Config
+
+```bash
+codexbar config reset
+```
+
+See the [CLI Reference](/cli/overview) for more commands.

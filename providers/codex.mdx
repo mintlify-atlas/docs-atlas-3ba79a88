@@ -1,0 +1,235 @@
+---
+title: Codex Provider
+description: Track OpenAI Codex usage with CLI RPC, OAuth API, and optional web dashboard extras
+---
+
+The Codex provider tracks usage for OpenAI's Codex coding assistant, supporting multiple authentication methods with automatic fallback.
+
+## Features
+
+- Session (5-hour) and weekly rate limit tracking
+- Credits balance monitoring
+- Local token cost analysis from session logs
+- Optional OpenAI web dashboard extras (usage charts, credits history)
+- Status page integration with OpenAI incidents
+
+## Authentication Methods
+
+CodexBar supports three primary authentication methods for Codex:
+
+<Tabs>
+  <Tab title="OAuth API (Recommended)">
+    ### OAuth API
+
+    The OAuth API is the preferred method for the app when credentials are available.
+
+    **Setup:**
+    1. Authenticate with Codex CLI: `codex auth login`
+    2. OAuth tokens are automatically saved to `~/.codex/auth.json`
+    3. CodexBar reads these credentials automatically
+
+    **API Details:**
+    - Endpoint: `GET https://chatgpt.com/backend-api/wham/usage`
+    - Authentication: `Authorization: Bearer <access_token>`
+    - Token refresh: Automatic when older than 8 days
+
+    **What it provides:**
+    - Rate limits (5-hour and weekly windows)
+    - Credits balance and unlimited status
+    - Account identity (email + plan type)
+  </Tab>
+
+  <Tab title="CLI RPC">
+    ### CLI RPC
+
+    Launches a local Codex RPC server for usage data.
+
+    **Setup:**
+    1. Install Codex CLI: `npm install -g @openai/codex-cli`
+    2. Authenticate: `codex auth login`
+    3. CodexBar launches `codex -s read-only -a untrusted app-server`
+
+    **How it works:**
+    - JSON-RPC over stdin/stdout
+    - Methods: `initialize`, `account/read`, `account/rateLimits/read`
+    - Provides usage windows, credits snapshot, and account identity
+
+    **Settings:**
+    - Preferences → Providers → Codex → Usage source: Auto/OAuth/CLI
+  </Tab>
+
+  <Tab title="CLI PTY (Fallback)">
+    ### CLI PTY Fallback
+
+    Runs Codex in an interactive terminal session as a last resort.
+
+    **How it works:**
+    1. Launches `codex` in a PTY session
+    2. Sends `/status` command
+    3. Parses the rendered output for:
+       - Credits balance
+       - 5-hour limit (percent + reset)
+       - Weekly limit (percent + reset)
+
+    **Settings:**
+    - Debug → "Keep CLI sessions alive" to persist sessions between probes
+
+    **Retry behavior:**
+    - Retries once with larger terminal size on parse failure
+    - No retry on timeout (fails fast)
+  </Tab>
+
+  <Tab title="Web Dashboard (Optional)">
+    ### OpenAI Web Dashboard
+
+    Optional enrichment that provides usage charts and credits history.
+
+    **Setup:**
+    1. Preferences → Providers → Codex → OpenAI cookies
+    2. Choose "Automatic" (imports from browser) or "Manual" (paste cookie header)
+
+    **What it provides:**
+    - Rate limits (5-hour + weekly)
+    - Credits remaining
+    - Code review remaining (%)
+    - Usage breakdown chart
+    - Credits usage history
+    - Credits purchase URL
+
+    **How it works:**
+    - URL: `https://chatgpt.com/codex/settings/usage`
+    - Uses off-screen `WKWebView` with per-account data store
+    - Imports cookies from Safari, Chrome, Firefox
+    - Cached in Keychain (`com.steipete.codexbar.cache`, account `cookie.codex`)
+
+    **Account matching:**
+    - Signed-in email extracted from HTML (`client-bootstrap` or `__NEXT_DATA__`)
+    - If Codex email is known and doesn't match, web path is rejected
+  </Tab>
+</Tabs>
+
+## Data Source Selection
+
+### App Default (Debug Menu Disabled)
+
+1. OAuth API (if `~/.codex/auth.json` exists)
+2. CLI RPC, with CLI PTY fallback
+3. If OpenAI cookies enabled, dashboard extras load in parallel (source becomes `primary + openai-web`)
+
+### CLI Default (`--source auto`)
+
+1. OpenAI web dashboard (when available)
+2. Codex CLI RPC, with CLI PTY fallback
+
+### Manual Override
+
+Preferences → Providers → Codex → Usage source:
+- **Auto** - Uses the default selection above
+- **OAuth** - Forces OAuth API only
+- **CLI** - Forces CLI RPC/PTY only
+
+## Local Cost Usage
+
+CodexBar scans local session logs to compute token costs:
+
+**Source files:**
+- `~/.codex/sessions/YYYY/MM/DD/*.jsonl`
+- `~/.codex/archived_sessions/*.jsonl`
+- Or `$CODEX_HOME/sessions/...` if `CODEX_HOME` is set
+
+**Scanner behavior:**
+- Parses `event_msg` token_count entries and `turn_context` model markers
+- Computes input/cached/output token deltas and per-model cost
+- Cached in `~/Library/Caches/CodexBar/cost-usage/codex-v1.json`
+- Window: last 30 days (rolling), 60s minimum refresh interval
+
+**View cost summary:**
+1. Settings → General → Show cost summary
+2. Menu shows "Cost (30d): $X.XX" below usage meters
+
+## Account Identity Resolution
+
+CodexBar determines your Codex account from:
+
+1. Latest Codex usage snapshot (from RPC)
+2. `~/.codex/auth.json` (JWT claims: email + plan)
+3. OpenAI dashboard signed-in email (cached)
+4. Last imported browser cookie email (cached)
+
+## Status Page Integration
+
+CodexBar monitors [OpenAI Status](https://status.openai.com) for incidents:
+
+- Polls Statuspage.io API every 5 minutes (configurable)
+- Displays incident badge on menu bar icon
+- Shows incident details in menu
+- Click "View Status" to open status page
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="OAuth token expired">
+    CodexBar automatically refreshes tokens older than 8 days. If refresh fails:
+    1. Run `codex auth login` to re-authenticate
+    2. Restart CodexBar
+  </Accordion>
+
+  <Accordion title="CLI RPC connection failed">
+    Check that Codex CLI is installed and authenticated:
+    ```bash
+    codex --version
+    codex /status
+    ```
+    If not authenticated, run `codex auth login`.
+  </Accordion>
+
+  <Accordion title="Web dashboard shows 'Login required'">
+    1. Visit https://chatgpt.com/codex/settings/usage in your browser
+    2. Log in with your OpenAI account
+    3. Return to CodexBar and click "Refresh"
+  </Accordion>
+
+  <Accordion title="CLI update needed">
+    CodexBar detects when the CLI has an available update:
+    ```bash
+    npm update -g @openai/codex-cli
+    ```
+  </Accordion>
+
+  <Accordion title="Keychain prompts for auth.json">
+    If OAuth credentials are stored in Keychain (non-standard), you may see prompts.
+    To avoid this:
+    1. Open Keychain Access.app
+    2. Search for "Codex" or "OpenAI"
+    3. Open the item → Access Control
+    4. Add CodexBar.app to "Always allow access by these applications"
+  </Accordion>
+</AccordionGroup>
+
+## CLI Usage
+
+```bash
+# Show Codex usage
+codexbar --provider codex
+codexbar -p codex
+
+# Force specific source
+codexbar -p codex --source oauth
+codexbar -p codex --source cli
+
+# Show cost summary
+codexbar cost --provider codex
+```
+
+## Key Files
+
+- **OAuth**: `Sources/CodexBarCore/Providers/Codex/CodexOAuthFetcher.swift`
+- **Web dashboard**: `Sources/CodexBarCore/OpenAIWeb/*`
+- **CLI RPC/PTY**: `Sources/CodexBarCore/Providers/Codex/CodexStatusProbe.swift`
+- **Cost usage**: `Sources/CodexBarCore/CostUsageFetcher.swift`, `Sources/CodexBarCore/Vendored/CostUsage/*`
+
+## Related Documentation
+
+- [Codex OAuth Details](/providers/codex) - OAuth implementation specifics
+- [CLI Reference](/cli/overview) - CLI usage and options
+- [Provider Authoring](/providers/authoring) - How providers work internally

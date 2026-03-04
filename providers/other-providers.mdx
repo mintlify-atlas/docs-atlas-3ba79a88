@@ -1,0 +1,608 @@
+---
+title: Other Providers
+description: Support for z.ai, Kimi, Kilo, Kimi K2, Kiro, Vertex AI, Augment, Amp, JetBrains AI, OpenRouter, Antigravity, and Droid/Factory
+---
+
+CodexBar supports many additional AI coding assistant providers beyond the primary ones. Each has its own authentication method and usage tracking capabilities.
+
+## z.ai
+
+API token-based provider for z.ai quota tracking.
+
+### Features
+- Tokens limit (primary window)
+- Time limit / MCP window (secondary, if tokens also present)
+- API region selection (global or BigModel China mainland)
+- Custom quota URL override
+
+### Authentication
+
+<Tabs>
+  <Tab title="Settings">
+    1. Preferences → Providers → z.ai
+    2. Enter your API token
+    3. Select API region (Global or China)
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    export Z_AI_API_KEY="your-token-here"
+    ```
+  </Tab>
+  <Tab title="Config File">
+    Edit `~/.codexbar/config.json`:
+    ```json
+    {
+      "providers": [
+        {
+          "id": "zai",
+          "apiKey": "your-token-here"
+        }
+      ]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### API Endpoints
+- **Global**: `GET https://api.z.ai/api/monitor/usage/quota/limit`
+- **China**: `GET https://open.bigmodel.cn/api/monitor/usage/quota/limit`
+- **Custom**: Set `Z_AI_QUOTA_URL` environment variable
+- **Host override**: Set `Z_AI_API_HOST` environment variable
+
+---
+
+## Kimi
+
+Browser cookie-based provider for Kimi For Coding.
+
+### Features
+- Weekly request quota tracking
+- 5-hour rate limit (300 minutes)
+- Membership tier display (Andante, Moderato, Allegretto)
+- Automatic and manual authentication
+
+### Authentication
+
+<Tabs>
+  <Tab title="Automatic (Recommended)">
+    1. Preferences → Providers → Kimi → Cookie source: Automatic
+    2. Log in to https://www.kimi.com/code in your browser
+    3. CodexBar imports cookies from Arc, Chrome, Safari, Edge, Brave, or Chromium
+  </Tab>
+  <Tab title="Manual Token">
+    1. Visit https://www.kimi.com/code/console
+    2. Open Developer Tools → Application → Cookies
+    3. Copy the `kimi-auth` cookie value (JWT token)
+    4. Preferences → Providers → Kimi → Cookie source: Manual
+    5. Paste the token
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    export KIMI_AUTH_TOKEN="jwt-token-here"
+    ```
+  </Tab>
+</Tabs>
+
+### API Details
+- **Endpoint**: `POST https://www.kimi.com/apiv2/kimi.gateway.billing.v1.BillingService/GetUsages`
+- **Authentication**: Bearer token from `kimi-auth` cookie
+
+### Membership Tiers
+
+| Tier | Price | Weekly Quota |
+| --- | --- | --- |
+| Andante | ¥49/month | 1,024 requests |
+| Moderato | ¥99/month | 2,048 requests |
+| Allegretto | ¥199/month | 7,168 requests |
+
+All tiers have a 200 requests per 5 hours rate limit.
+
+---
+
+## Kilo
+
+API and CLI-backed provider for Kilo usage tracking.
+
+### Features
+- Auto-fallback from API to CLI auth
+- Plan and activity tracking
+- Configurable source mode (auto, api, cli)
+
+### Authentication
+
+<Tabs>
+  <Tab title="API Token">
+    ```bash
+    export KILO_API_KEY="your-api-key"
+    ```
+    Or edit `~/.codexbar/config.json`:
+    ```json
+    {
+      "providers": [
+        {
+          "id": "kilo",
+          "apiKey": "your-api-key"
+        }
+      ]
+    }
+    ```
+  </Tab>
+  <Tab title="CLI Session">
+    1. Install Kilo CLI
+    2. Run `kilo login`
+    3. CLI creates `~/.local/share/kilo/auth.json`
+    4. CodexBar uses `kilo.access` from auth file
+  </Tab>
+</Tabs>
+
+### Source Modes
+- **Auto** (default): Tries API first, falls back to CLI on 401/403 or missing credentials
+- **API**: API token only
+- **CLI**: CLI session only
+
+Settings → Providers → Kilo → Usage source
+
+### API Details
+- **Endpoint**: `https://app.kilo.ai/api/trpc`
+- **Authentication**: Bearer token from config or environment
+
+---
+
+## Kimi K2
+
+API key-based provider for Kimi K2 credit tracking.
+
+### Features
+- Credit usage tracking (consumed / remaining)
+- No explicit reset timestamp
+
+### Authentication
+
+<Tabs>
+  <Tab title="Settings">
+    Preferences → Providers → Kimi K2 → Enter API key
+  </Tab>
+  <Tab title="Environment Variable">
+    ```bash
+    export KIMI_K2_API_KEY="your-api-key"
+    # or
+    export KIMI_API_KEY="your-api-key"
+    # or
+    export KIMI_KEY="your-api-key"
+    ```
+  </Tab>
+</Tabs>
+
+### API Details
+- **Endpoint**: `GET https://kimi-k2.ai/api/user/credits`
+- **Headers**: `Authorization: Bearer <api_key>`, `Accept: application/json`
+- **Response header**: `X-Credits-Remaining`
+
+---
+
+## Kiro
+
+CLI-based provider for AWS Kiro usage tracking.
+
+### Features
+- Monthly credits percentage tracking
+- Bonus credits tracking
+- Plan name display (e.g., "KIRO FREE")
+- AWS Builder ID authentication via CLI
+
+### Authentication
+
+1. Install `kiro-cli`
+2. Log in with AWS Builder ID:
+   ```bash
+   kiro-cli auth login
+   ```
+3. CodexBar runs `kiro-cli chat --no-interactive "/usage"`
+
+### CLI Command
+```bash
+kiro-cli chat --no-interactive "/usage"
+```
+**Timeout**: 20 seconds (idle cutoff after ~10s of no output)
+
+### Output Format
+Kiro CLI returns ANSI-decorated usage table:
+- Monthly credits: percentage bar + reset date
+- Bonus credits: consumed/total + expiry days
+
+### Status Page
+- Manual link to [AWS Health Dashboard](https://health.aws.amazon.com/health/status)
+- No auto-polling
+
+---
+
+## Vertex AI
+
+Google Cloud OAuth provider for Vertex AI quota tracking.
+
+### Features
+- Cloud Monitoring quota usage (time-series metrics)
+- Token cost tracking from local Claude logs (Vertex AI entries)
+- Automatic project discovery
+
+### Authentication
+
+1. Install and configure gcloud:
+   ```bash
+   gcloud auth application-default login
+   gcloud config set project PROJECT_ID
+   ```
+2. CodexBar reads `application_default_credentials.json` from gcloud config directory
+
+### API Endpoints
+- **Cloud Monitoring timeSeries**:
+  - Usage: `serviceruntime.googleapis.com/quota/allocation/usage`
+  - Limit: `serviceruntime.googleapis.com/quota/limit`
+  - Resource: `consumer_quota` with `service="aiplatform.googleapis.com"`
+
+### Token Cost Tracking
+
+Vertex AI Claude usage is logged to `~/.claude/projects/` alongside direct Anthropic API usage.
+
+**Detection methods:**
+1. **Model name format** (primary): Vertex AI uses `@` as version separator
+   - Vertex AI: `claude-opus-4-5@20251101`
+   - Anthropic: `claude-opus-4-5-20251101`
+2. **Metadata fields** (fallback): `metadata.provider: "vertexai"` or keys containing `vertex`/`gcp`
+
+**Requirements:**
+1. Enable Vertex AI provider in Settings → Providers
+2. Enable "Show cost summary" in Settings → General
+3. Use Claude Code with Vertex AI model names (with `@` format)
+
+### Environment Variables
+- `GOOGLE_CLOUD_PROJECT`
+- `GCLOUD_PROJECT`
+- `CLOUDSDK_CORE_PROJECT`
+
+---
+
+## Augment
+
+Browser cookie-based provider with automatic session keepalive.
+
+### Features
+- Credits tracking and monthly limits
+- Usage monitoring (credits consumed)
+- Plan information display
+- CLI integration (`auggie account status`)
+- Automatic session keepalive (prevents cookie expiration)
+- Multi-browser support: Chrome, Chrome Beta, Chrome Canary, Arc, Safari
+
+### Authentication
+
+<Tabs>
+  <Tab title="Automatic (Recommended)">
+    1. Preferences → Providers → Augment → Enable
+    2. Cookie source: Automatic
+    3. Log in to https://app.augmentcode.com in Chrome Beta, Chrome, or Arc
+  </Tab>
+  <Tab title="Manual Cookie Entry">
+    1. Open Chrome DevTools → Application → Cookies → https://app.augmentcode.com
+    2. Copy all cookie values
+    3. Format as: `cookie1=value1; cookie2=value2; ...`
+    4. Preferences → Providers → Augment → Cookie source: Manual
+    5. Paste cookie header
+  </Tab>
+  <Tab title="Auggie CLI">
+    If `auggie` CLI is installed, CodexBar prefers `auggie account status` and avoids browser prompts.
+  </Tab>
+</Tabs>
+
+### Cookie Names
+- `_session` (legacy)
+- `auth0`, `auth0.is.authenticated`, `a0.spajs.txs` (Auth0)
+- `__Secure-next-auth.session-token`, `next-auth.session-token` (NextAuth)
+- `__Host-authjs.csrf-token`, `authjs.session-token` (AuthJS)
+- `session`, `web_rpc_proxy_session` (Augment-specific)
+
+### Session Keepalive
+- **Check interval**: Every 5 minutes
+- **Refresh buffer**: Refreshes 5 minutes before cookie expiration
+- **Rate limiting**: Minimum 2 minutes between refresh attempts
+- **Session cookies**: Refreshed every 30 minutes (no expiration date)
+
+### API Endpoints
+- **Credits**: `https://app.augmentcode.com/api/credits`
+- **Subscription**: `https://app.augmentcode.com/api/subscription`
+
+---
+
+## Amp
+
+Browser cookie-based provider for Amp Free usage tracking.
+
+### Features
+- Amp Free daily usage meter
+- Time-to-full reset countdown
+- Hourly replenishment rate
+
+### Authentication
+
+<Tabs>
+  <Tab title="Automatic">
+    1. Preferences → Providers → Amp → Enable
+    2. Cookie source: Auto (default)
+    3. Log in to https://ampcode.com in Safari or Chromium-based browser
+  </Tab>
+  <Tab title="Manual">
+    1. Open https://ampcode.com/settings
+    2. Copy `Cookie:` header from Network tab
+    3. Preferences → Providers → Amp → Cookie source: Manual
+    4. Paste cookie header
+  </Tab>
+</Tabs>
+
+### API Details
+- **Endpoint**: `https://ampcode.com/settings`
+- Parses embedded `freeTierUsage` payload from HTML
+- Computes time-to-full from hourly replenishment rate
+
+---
+
+## JetBrains AI
+
+Local XML-based provider for JetBrains IDE quota tracking.
+
+### Features
+- Monthly credits tracking
+- Refill date countdown
+- Auto-detects installed JetBrains IDEs
+- Uses most recently modified IDE
+
+### Supported IDEs
+- IntelliJ IDEA
+- PyCharm
+- WebStorm
+- GoLand
+- CLion
+- DataGrip
+- RubyMine
+- Rider
+- PhpStorm
+- RustRover
+- Android Studio
+- Fleet
+- Aqua
+- DataSpell
+
+### Data Source
+
+**File locations:**
+- macOS: `~/Library/Application Support/JetBrains/`
+- macOS (Android Studio): `~/Library/Application Support/Google/`
+- Linux: `~/.config/JetBrains/`
+- Linux (Android Studio): `~/.config/Google/`
+
+**File**: `<IDE_BASE>/options/AIAssistantQuotaManager2.xml`
+
+### XML Structure
+- `quotaInfo` attribute (JSON): `type`, `current`, `maximum`, `tariffQuota.available`, `until`
+- `nextRefill` attribute (JSON): `type`, `next`, `tariff.amount`, `tariff.duration`
+
+### Settings
+- **IDE Picker**: Auto-detected IDEs list or "Auto-detect" (default)
+- **Custom Path**: Manual base path override
+
+### Constraints
+- Requires JetBrains IDE with AI Assistant enabled
+- XML file only exists after AI Assistant usage
+- Internal file format may change between IDE versions
+
+---
+
+## OpenRouter
+
+API token-based provider for OpenRouter credit tracking.
+
+### Features
+- Credit usage percentage tracking
+- Balance display (total credits - usage)
+- Rate limit information
+- Multi-provider AI model access (OpenAI, Anthropic, Google, Meta, etc.)
+
+### Authentication
+
+<Tabs>
+  <Tab title="Environment Variable">
+    ```bash
+    export OPENROUTER_API_KEY="sk-or-v1-..."
+    ```
+  </Tab>
+  <Tab title="Settings">
+    Preferences → Providers → OpenRouter → Enter API key
+  </Tab>
+  <Tab title="Config File">
+    Edit `~/.codexbar/config.json`:
+    ```json
+    {
+      "providerConfig": {
+        "openrouter": {
+          "apiKey": "sk-or-v1-..."
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### API Endpoints
+
+1. **Credits API** (`/api/v1/credits`):
+   - Returns total credits purchased and total usage
+   - Balance = total_credits - total_usage
+
+2. **Key API** (`/api/v1/key`):
+   - Returns rate limit information
+
+### Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| `OPENROUTER_API_KEY` | Your OpenRouter API key (required) |
+| `OPENROUTER_API_URL` | Override base API URL (defaults to `https://openrouter.ai/api/v1`) |
+| `OPENROUTER_HTTP_REFERER` | Client referer sent as `HTTP-Referer` header |
+| `OPENROUTER_X_TITLE` | Client title sent as `X-Title` header (defaults to `CodexBar`) |
+
+### Notes
+- Credit values are cached on OpenRouter's side and may be up to 60 seconds stale
+- Pre-purchase credits for usage
+- Rate limits: 10+ credits = 1000 free model requests/day
+
+### Status Page
+- Manual link to [status.openrouter.ai](https://status.openrouter.ai)
+- No auto-polling yet
+
+---
+
+## Antigravity
+
+Local language server probe for Antigravity usage tracking.
+
+### Features
+- Model-specific quota tracking (Claude, Gemini Pro Low, Gemini Flash)
+- Local-only (no external authentication)
+- Automatic port discovery
+- HTTPS and HTTP support
+
+### How It Works
+
+1. **Process detection**:
+   - Finds `language_server_macos` process with Antigravity markers
+   - Extracts `--csrf_token` and `--extension_server_port` flags
+
+2. **Port discovery**:
+   - Runs `lsof -nP -iTCP -sTCP:LISTEN -p <pid>`
+   - Probes all listening ports
+
+3. **Connect port probe** (HTTPS):
+   - `POST https://127.0.0.1:<port>/exa.language_server_pb.LanguageServerService/GetUnleashData`
+   - Headers: `X-Codeium-Csrf-Token: <token>`, `Connect-Protocol-Version: 1`
+   - First 200 OK response selects the connect port
+
+4. **Quota fetch**:
+   - Primary: `GetUserStatus`
+   - Fallback: `GetCommandModelConfigs`
+   - Retries over HTTP on `extension_server_port` if HTTPS fails
+
+### Model Mapping Priority
+
+1. Claude (label contains `claude` but not `thinking`)
+2. Gemini Pro Low (label contains `pro` + `low`)
+3. Gemini Flash (label contains `gemini` + `flash`)
+4. Fallback: lowest remaining percent
+
+### UI Mapping
+- **Primary**: Claude quota
+- **Secondary**: Gemini Pro quota
+- **Tertiary**: Gemini Flash quota
+
+### Constraints
+- Internal protocol (fields may change)
+- Requires `lsof` for port detection
+- Local HTTPS uses self-signed cert (insecure TLS allowed)
+- Requires Antigravity app running
+
+### Status Page
+- Google Workspace incidents for Gemini product
+
+---
+
+## Droid (Factory)
+
+Web-based provider for Factory (Droid) usage tracking.
+
+### Features
+- Standard and Premium token usage tracking
+- Billing window with reset date
+- Multiple authentication fallback paths
+- WorkOS token minting support
+
+### Authentication Methods (Fallback Order)
+
+1. Cached cookie header (Keychain)
+2. Stored session (`~/Library/Application Support/CodexBar/factory-session.json`)
+3. Stored bearer token (same session file)
+4. Stored WorkOS refresh token (same session file)
+5. Local storage WorkOS tokens (Safari + Chrome/Chromium/Arc leveldb)
+6. Browser cookies (Safari only) for Factory domains
+7. WorkOS cookies (Safari) to mint tokens
+8. Browser cookies (Chrome, Firefox) for Factory domains
+9. WorkOS cookies (Chrome, Firefox) to mint tokens
+
+### Cookie Domains
+- `factory.ai`
+- `app.factory.ai`
+- `auth.factory.ai`
+
+### Session Cookie Names
+- `wos-session`
+- `__Secure-next-auth.session-token`
+- `next-auth.session-token`
+- `__Secure-authjs.session-token`
+- `__Host-authjs.csrf-token`
+- `authjs.session-token`
+- `session`
+- `access-token`
+
+### API Endpoints
+
+**Base URL candidates** (tried in order):
+- `https://auth.factory.ai`
+- `https://api.factory.ai`
+- `https://app.factory.ai`
+
+**Endpoints:**
+1. `GET <baseURL>/api/app/auth/me`
+   - Org + subscription metadata + feature flags
+2. `POST <baseURL>/api/organization/subscription/usage`
+   - Body: `{ "useCache": true, "userId": "<id?>" }`
+   - Standard + Premium token usage and billing window
+
+### WorkOS Token Minting
+
+```
+POST https://api.workos.com/user_management/authenticate
+```
+**Body:**
+- `client_id`: one of `client_01HXRMBQ9BJ3E7QSTQ9X2PHVB7` or `client_01HNM792M5G5G1A2THWPXKFMXB`
+- `grant_type`: `refresh_token`
+- `refresh_token`: from local storage or session store
+- Optional: `organization_id`, `useCookie: true`
+
+### Local Storage WorkOS Tokens
+
+**Safari:**
+- Root: `~/Library/Containers/com.apple.Safari/Data/Library/WebKit/WebsiteData/Default`
+- Finds `origin` files containing `app.factory.ai` or `auth.factory.ai`
+- Reads `LocalStorage/localstorage.sqlite3`
+
+**Chrome/Chromium/Arc:**
+- Roots: `~/Library/Application Support/<Browser>/User Data/<Profile>/Local Storage/leveldb`
+- Scans LevelDB files for `workos:refresh-token` and `workos:access-token`
+
+### Snapshot Mapping
+- **Primary**: Standard usage ratio
+- **Secondary**: Premium usage ratio
+- **Reset**: Billing period end date
+
+### Status Page
+- [status.factory.ai](https://status.factory.ai)
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Multiple Providers" icon="layer-group" href="/configuration">
+    Enable and manage multiple providers simultaneously
+  </Card>
+  <Card title="Author a New Provider" icon="code" href="/providers/authoring">
+    Learn how to add support for a new provider
+  </Card>
+</CardGroup>

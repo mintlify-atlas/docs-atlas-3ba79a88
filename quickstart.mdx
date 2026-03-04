@@ -1,80 +1,277 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Get CodexBar up and running in minutes
 ---
 
-## Get started in three steps
+## First run setup
 
-Get your documentation site running locally and make your first customization.
+After installing CodexBar, follow these steps to configure your providers and start tracking usage.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Open Settings">
+    Launch CodexBar and click the menu bar icon, then select **Settings** (or press `⌘,`).
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    Navigate to **Settings → Providers** to see all available AI coding assistants.
+  </Step>
+  
+  <Step title="Enable your providers">
+    Toggle on the providers you actively use:
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    - **Codex** (OpenAI)
+    - **Claude Code**
+    - **Cursor**
+    - **Gemini**
+    - **Copilot**
+    - And 10+ more providers
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
+    <Info>
+      Each enabled provider appears as a separate menu bar icon by default. You can combine them using **Merge Icons** mode in Settings.
+    </Info>
+  </Step>
+  
+  <Step title="Configure authentication">
+    Install and sign in to the provider sources you rely on:
+    
+    - **CLI tools**: `codex`, `claude`, `gemini`, etc.
+    - **Browser cookies**: Safari, Chrome, or Firefox sessions
+    - **OAuth**: Direct API authentication
+    
+    For Codex web dashboard extras, go to **Settings → Providers → Codex → OpenAI cookies** and choose **Automatic** or **Manual** import.
+    
+    <Note>
+      CodexBar reuses your existing authentication. No passwords are stored.
+    </Note>
+  </Step>
+</Steps>
+
+## Provider-specific setup
+
+Different providers require different authentication methods. Choose your provider below for detailed setup instructions.
+
+<Tabs>
+  <Tab title="Codex">
+    ### Codex (OpenAI CLI)
+    
+    **Prerequisites:**
+    - Install the Codex CLI: `npm install -g @openai/codex-cli`
+    - Authenticate: `codex auth`
+    
+    **Optional: Web Dashboard**
+    
+    For enhanced metrics (code review remaining, usage breakdown, credits history):
+    
+    1. Go to **Settings → Providers → Codex**
+    2. Under **OpenAI cookies**, select **Automatic** (reads Safari/Chrome/Firefox) or **Manual** (paste session cookie)
+    3. Grant Full Disk Access if using Safari cookies
+    
+    **Verify it works:**
+    ```bash
+    codexbar --provider codex
+    ```
+  </Tab>
+  
+  <Tab title="Claude">
+    ### Claude Code
+    
+    CodexBar supports three authentication methods for Claude (tried in order):
+    
+    1. **OAuth API** (recommended)
+       - Install Claude CLI: `brew install anthropics/claude/claude-cli`
+       - Authenticate: `claude auth`
+       - CodexBar reads credentials from Keychain
+    
+    2. **Browser Cookies**
+       - Log in to claude.ai in your browser
+       - CodexBar reads session from Safari, Chrome, or Firefox
+       - Requires Full Disk Access for Safari
+    
+    3. **CLI PTY** (fallback)
+       - Uses `claude` CLI status output
+       - Less reliable than OAuth or web
+    
+    **Verify it works:**
+    ```bash
+    codexbar --provider claude --source oauth
+    ```
+  </Tab>
+  
+  <Tab title="Other Providers">
+    ### Cursor, Gemini, Copilot, and more
+    
+    **Cursor**
+    - Log in to cursor.com in your browser
+    - CodexBar reads session cookies automatically
+    
+    **Gemini**
+    - Install Gemini CLI: `npm install -g @google/generative-ai-cli`
+    - Authenticate: `gemini auth`
+    - CodexBar uses OAuth API with your credentials
+    
+    **Copilot**
+    - CodexBar triggers GitHub device flow automatically
+    - Or set `COPILOT_API_TOKEN` environment variable
+    
+    See [Providers documentation](/providers/overview) for complete setup guides for all 15+ supported providers.
+  </Tab>
+</Tabs>
+
+## Understanding the menu bar icon
+
+CodexBar displays usage with a two-bar meter:
+
+- **Top bar**: Session or 5-hour window usage (0–100%)
+- **Bottom bar**: Weekly window usage (thin hairline, 0–100%)
+
+**Visual indicators:**
+- **Dimmed icon**: Data is stale or an error occurred
+- **Status overlay**: Service incident detected
+- **Thicker top bar**: Credits remaining (when weekly is exhausted)
+
+Click the icon to see detailed metrics:
+- Session percentage and reset countdown
+- Weekly percentage and reset countdown
+- Credits remaining (where applicable)
+- Account info and plan details
+
+## Using the CLI
+
+CodexBar includes a powerful CLI for scripting and CI pipelines.
+
+<Steps>
+  <Step title="Install the CLI">
+    In the app: **Settings → Advanced → Install CLI**
+    
+    Or manually:
+    ```bash
+    ln -sf "/Applications/CodexBar.app/Contents/Helpers/CodexBarCLI" /usr/local/bin/codexbar
+    ```
+  </Step>
+  
+  <Step title="Run commands">
+    **Check usage:**
+    ```bash
+    codexbar
+    # or specify provider
+    codexbar --provider claude
+    ```
+    
+    **JSON output:**
+    ```bash
+    codexbar --format json --pretty
+    ```
+    
+    **Cost tracking:**
+    ```bash
+    codexbar cost --provider codex
+    ```
+    
+    **All providers:**
+    ```bash
+    codexbar --provider all
+    ```
+  </Step>
+</Steps>
+
+See [CLI documentation](/cli/overview) for complete command reference.
+
+## Customizing settings
+
+### Merge Icons mode
+
+Combine all providers into a single menu bar icon:
+
+1. Go to **Settings → General**
+2. Enable **Merge Icons**
+3. Click the unified icon to switch between providers
+4. Enable **Overview tab** to see up to 3 providers at once
+
+### Refresh cadence
+
+Control how often CodexBar checks for updates:
+
+- **Manual**: Click to refresh
+- **1m, 2m, 5m, 15m**: Automatic refresh intervals
+- **30m**: Battery-friendly option
+
+### Reset time display
+
+Choose how reset times are shown:
+
+- **Countdown**: "Resets in 3h 24m"
+- **Absolute**: "Resets at 2:15 PM"
+- **Relative**: "Resets tomorrow at 1:00 AM"
+
+## Privacy and security
+
+CodexBar is privacy-first:
+
+- **On-device parsing**: All data processing happens locally
+- **No passwords stored**: Reuses existing CLI and browser auth
+- **Opt-in cookies**: Browser cookie access requires your permission
+- **Minimal access**: Only reads known locations (no filesystem crawling)
+- **Open source**: Auditable at [github.com/steipete/codexbar](https://github.com/steipete/codexbar)
+
+See [Privacy documentation](/features/privacy) for details.
+
+## Troubleshooting
+
+<Accordion title="Menu bar icon is dimmed">
+  This means data is stale or an error occurred:
+  
+  1. Click the icon to see the error message
+  2. Verify provider CLI is installed and authenticated
+  3. Check that browser is logged in (for cookie-based providers)
+  4. Grant required macOS permissions (Keychain, Full Disk Access)
+  5. Try manual refresh: **Settings → General → Refresh Now**
 </Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Accordion title="Keychain keeps prompting for access">
+  To stop repeated Keychain prompts:
+  
+  1. Open **Keychain Access.app**
+  2. Search for the credential (e.g., "Chrome Safe Storage" or "Claude Code-credentials")
+  3. Open the item → **Access Control**
+  4. Click **+** and add **CodexBar.app**
+  5. Save and relaunch CodexBar
+  
+  See [Permissions guide](/configuration/permissions) for detailed instructions with screenshots.
+</Accordion>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Accordion title="Full Disk Access required but I don't want to grant it">
+  Full Disk Access is only needed for Safari cookies. Alternatives:
+  
+  - Use Chrome or Firefox cookies instead (no FDA required)
+  - Use CLI-only authentication (no browser cookies)
+  - Use OAuth where supported (Claude, Gemini, Copilot)
+</Accordion>
 
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
+<Accordion title="Provider shows '0% left' but I have usage available">
+  This can happen if:
+  
+  - Session expired: Re-authenticate with the provider CLI or browser
+  - API changed: Check for CodexBar updates
+  - Wrong account: Verify you're logged in to the correct account
+  
+  Try forcing a specific source:
+  ```bash
+  codexbar --provider codex --source web
+  codexbar --provider claude --source oauth
+  ```
 </Accordion>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Explore providers" icon="grid" href="/providers/overview">
+    Learn about all 15+ supported AI coding assistants
+  </Card>
+  <Card title="CLI reference" icon="terminal" href="/cli/overview">
+    Use CodexBar in scripts and CI pipelines
+  </Card>
+  <Card title="Configure settings" icon="sliders" href="/configuration/settings">
+    Customize refresh cadence, display options, and more
+  </Card>
+  <Card title="Build from source" icon="code" href="/development/building">
+    Contribute or build your own custom version
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
